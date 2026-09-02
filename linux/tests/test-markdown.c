@@ -58,6 +58,36 @@ test_markdown_rendering(void)
 }
 
 static void
+test_table_and_html_break_rendering(void)
+{
+  const char *markdown =
+    "| # | Category | Details |\n"
+    "|---|----------|---------|\n"
+    "| 1 | Varieties | • Navel <br>• Valencia |\n"
+    "| 2 | Nutrients | **Vitamin C**<br/>Fiber<br />Potassium |";
+  const char *expected =
+    "#  │  Category  │  Details\n"
+    "1  │  Varieties  │  • Navel \n• Valencia\n"
+    "2  │  Nutrients  │  Vitamin C\nFiber\nPotassium";
+  g_autoptr(GtkTextBuffer) buffer = gtk_text_buffer_new(NULL);
+
+  dk_markdown_setup_buffer(buffer);
+  dk_markdown_render(buffer, markdown);
+
+  GtkTextIter start;
+  GtkTextIter end;
+  gtk_text_buffer_get_bounds(buffer, &start, &end);
+  g_autofree char *rendered = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
+
+  g_assert_cmpstr(rendered, ==, expected);
+  g_assert_null(strstr(rendered, "<br"));
+  g_assert_null(strchr(rendered, '|'));
+  assert_tag_at(buffer, "table-header", text_offset(rendered, "Category"));
+  assert_tag_at(buffer, "table", text_offset(rendered, "Varieties"));
+  assert_tag_at(buffer, "strong", text_offset(rendered, "Vitamin C"));
+}
+
+static void
 test_invalid_utf8_is_visible(void)
 {
   const char markdown[] = { 'O', 'K', ' ', (char) 0xff, '\0' };
@@ -81,6 +111,7 @@ main(int argc, char **argv)
 {
   g_test_init(&argc, &argv, NULL);
   g_test_add_func("/markdown/rendering", test_markdown_rendering);
+  g_test_add_func("/markdown/table-and-html-breaks", test_table_and_html_break_rendering);
   g_test_add_func("/markdown/invalid-utf8", test_invalid_utf8_is_visible);
   return g_test_run();
 }

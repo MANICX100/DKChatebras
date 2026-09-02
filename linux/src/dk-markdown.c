@@ -230,6 +230,20 @@ render_code_span(Renderer *renderer, const char *begin, const char *end)
   add_range(renderer, start, renderer->offset, "code");
 }
 
+static gsize
+html_break_length(const char *position, const char *end)
+{
+  gsize remaining = (gsize) (end - position);
+
+  if (remaining >= 6 && g_ascii_strncasecmp(position, "<br />", 6) == 0)
+    return 6;
+  if (remaining >= 5 && g_ascii_strncasecmp(position, "<br/>", 5) == 0)
+    return 5;
+  if (remaining >= 4 && g_ascii_strncasecmp(position, "<br>", 4) == 0)
+    return 4;
+  return 0;
+}
+
 static void
 render_inline(Renderer *renderer, const char *begin, const char *end, guint depth)
 {
@@ -241,6 +255,13 @@ render_inline(Renderer *renderer, const char *begin, const char *end, guint dept
   }
 
   while (cursor < end) {
+    gsize break_length = html_break_length(cursor, end);
+    if (break_length > 0) {
+      append_literal(renderer, "\n");
+      cursor += break_length;
+      continue;
+    }
+
     if (*cursor == '\\' && cursor + 1 < end &&
         ((guchar) cursor[1]) < 0x80 && g_ascii_ispunct(cursor[1])) {
       append_text(renderer, cursor + 1, 1);
@@ -475,6 +496,71 @@ parse_heading(const char *line,
   return TRUE;
 }
 
+static GPtrArray *
+parse_table_cells(const char *line, const char *end)
+{
+  g_autofree char *copy = g_strndup(line, end - line);
+  char *body = g_strstrip(copy);
+
+  if (strchr(body, '|') == NULL)
+    return NULL;
+  if (*body == '|')
+    body++;
+
+  gsize length = strlen(body);
+  if (length > 0 && body[length - 1] == '|')
+    body[length - 1] = '\0';
+
+  g_auto(GStrv) parts = g_strsplit(body, "|", -1);
+  GPtrArray *cells = g_ptr_array_new_with_free_func(g_free);
+  for (guint i = 0; parts[i] != NULL; i++)
+    g_ptr_array_add(cells, g_strdup(g_strstrip(parts[i])));
+  return cells;
+}
+
+static gboolean
+is_table_delimiter(GPtrArray *cells)
+{
+  if (cells == NULL || cells->len == 0)
+    return FALSE;
+
+  for (guint i = 0; i < cells->len; i++) {
+    const char *cursor = g_ptr_array_index(cells, i);
+    guint dashes = 0;
+
+    if (*cursor == ':')
+      cursor++;
+    while (*cursor == '-') {
+      dashes++;
+      cursor++;
+    }
+    if (*cursor == ':')
+      cursor++;
+    if (*cursor != '\0' || dashes < 3)
+      return FALSE;
+  }
+
+  return TRUE;
+}
+
+static void
+render_table_row(Renderer *renderer, GPtrArray *cells, gboolean header)
+{
+  start_line(renderer);
+  gint start = renderer->offset;
+
+  for (guint i = 0; i < cells->len; i++) {
+    const char *cell = g_ptr_array_index(cells, i);
+    if (i > 0)
+      append_literal(renderer, "  │  ");
+    render_inline(renderer, cell, cell + strlen(cell), 0);
+  }
+
+  add_range(renderer, start, renderer->offset, "table");
+  if (header)
+    add_range(renderer, start, renderer->offset, "table-header");
+}
+
 static gboolean
 parse_list_item(const char *line,
                 const char *end,
@@ -530,6 +616,8 @@ dk_markdown_setup_buffer(GtkTextBuffer *buffer)
   gtk_text_buffer_create_tag(buffer, "list", "left-margin", 12, "indent", -8, NULL);
   gtk_text_buffer_create_tag(buffer, "link", "underline", PANGO_UNDERLINE_SINGLE, "foreground", "#3584e4", NULL);
   gtk_text_buffer_create_tag(buffer, "horizontal-rule", "justification", GTK_JUSTIFY_CENTER, "foreground", "gray", "pixels-above-lines", 6, "pixels-below-lines", 6, NULL);
+  gtk_text_buffer_create_tag(buffer, "table", "family", "monospace", "pixels-above-lines", 2, "pixels-below-lines", 2, NULL);
+  gtk_text_buffer_create_tag(buffer, "table-header", "weight", PANGO_WEIGHT_BOLD, "underline", PANGO_UNDERLINE_SINGLE, NULL);
 }
 
 void
@@ -565,6 +653,31 @@ dk_markdown_render(GtkTextBuffer *buffer, const char *markdown)
       append_text(&renderer, line, end - line);
       add_range(&renderer, start, renderer.offset, "code-block");
       continue;
+    }
+
+    if (lines[i + 1] != NULL) {
+      const char *delimiter_line = lines[i + 1];
+      const char *delimiter_end = delimiter_line + strlen(delimiter_line);
+      g_autoptr(GPtrArray) header_cells = parse_table_cells(line, end);
+      g_autoptr(GPtrArray) delimiter_cells = parse_table_cells(delimiter_line, delimiter_end);
+
+      if (header_cells != NULL && delimiter_cells != NULL &&
+          header_cells->len == delimiter_cells->len &&
+          is_table_delimiter(delimiter_cells)) {
+        render_table_row(&renderer, header_cells, TRUE);
+        i++;
+
+        while (lines[i + 1] != NULL) {
+          const char *row_line = lines[i + 1];
+          const char *row_end = row_line + strlen(row_line);
+          g_autoptr(GPtrArray) row_cells = parse_table_cells(row_line, row_end);
+          if (row_cells == NULL)
+            break;
+          render_table_row(&renderer, row_cells, FALSE);
+          i++;
+        }
+        continue;
+      }
     }
 
     if (parse_fence(line, end, &candidate_marker, &candidate_length, &fence_remainder)) {
