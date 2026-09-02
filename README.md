@@ -19,7 +19,7 @@ The root `index.html`, `app.js`, and `styles.css` implement the web edition.
 python -m http.server 8080
 ```
 
-Open `http://localhost:8080`, select the settings button, and save your Cerebras API key. The key is stored in browser `localStorage`; conversation summaries and messages use separate IndexedDB stores. A source key in `config.js` remains an optional migration fallback.
+Open `http://localhost:8080` and paste your Cerebras API key directly into the top-bar field. It saves automatically in browser `localStorage`; clearing the field removes it. Conversation summaries and messages use separate IndexedDB stores. A source key in `config.js` remains an optional migration fallback.
 
 Anyone with access to the browser profile or developer tools can read a web-stored key. Use the web edition only on a trusted local profile.
 

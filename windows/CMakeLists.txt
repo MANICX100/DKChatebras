@@ -28,3 +28,19 @@ set_target_properties(DKChatebras PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
 )
+
+option(DKCHATEBRAS_BUILD_TESTS "Build native RichEdit Markdown regression tests" OFF)
+if(DKCHATEBRAS_BUILD_TESTS)
+    add_executable(DKChatebrasMarkdownTests
+        tests/markdown_test.cpp
+        src/markdown.cpp
+    )
+    target_include_directories(DKChatebrasMarkdownTests PRIVATE src)
+    target_compile_features(DKChatebrasMarkdownTests PRIVATE cxx_std_17)
+    target_compile_definitions(DKChatebrasMarkdownTests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+    if(MSVC)
+        set_property(TARGET DKChatebrasMarkdownTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        target_compile_options(DKChatebrasMarkdownTests PRIVATE /W4 /permissive- /EHsc /utf-8)
+    endif()
+    target_link_libraries(DKChatebrasMarkdownTests PRIVATE user32)
+endif()

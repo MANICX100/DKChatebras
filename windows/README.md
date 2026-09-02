@@ -8,7 +8,7 @@ DKChatebras is a dependency-free native Win32 desktop client for Cerebras chat c
 - Models: `gpt-oss-120b` and `gemma-4-31b`
 - API-key settings stored with user-scoped Windows DPAPI under `%LOCALAPPDATA%\DKChatebras`
 - One file per conversation; the sidebar reads compact summary headers and loads full messages only when selected
-- New, delete, stop, scrolling, clickable links, and native RichEdit Markdown formatting for headings 1–6, nested bold/italic, strikethrough, inline/fenced code, blockquotes, ordered/unordered lists, links, horizontal rules, and escapes
+- New, delete, stop, scrolling, clickable links, and native RichEdit Markdown formatting for headings 1–6, nested bold/italic, strikethrough, inline/fenced code, blockquotes, ordered/unordered lists, GFM tables, links, horizontal rules, and escapes
 - The composer receives keyboard focus and an accent highlight by default, after generation, and when switching chats
 - Segoe UI and custom-painted rounded surfaces with system dark preference and modern DWM frame attributes where available
 - Static MSVC runtime (`/MT`) and a single x64 executable

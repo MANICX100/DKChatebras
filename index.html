@@ -57,13 +57,11 @@
             <option value="gemma-4-31b">Gemma 4 31B</option>
           </select>
         </div>
-        <div class="topbar-actions">
+        <div class="api-key-control">
+          <input id="api-key" type="password" autocomplete="off" spellcheck="false" aria-label="Cerebras API key" placeholder="Paste Cerebras API key">
           <div class="api-state" id="api-state" role="status">
-            <span></span><span>Checking key</span>
+            <span></span><span>Paste key</span>
           </div>
-          <button class="icon-button" id="open-settings" type="button" aria-label="Open API key settings">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15a1.7 1.7 0 0 0-1.55-1H3v-4h.08A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63h.01A1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9v.01A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>
-          </button>
         </div>
       </header>
 
@@ -101,29 +99,6 @@
     </main>
   </div>
 
-  <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title" aria-describedby="settings-description">
-    <form class="settings-form" id="settings-form">
-      <div class="settings-heading">
-        <div class="settings-title-group">
-          <p class="eyebrow">DKChatebras</p>
-          <h2 id="settings-title">API key settings</h2>
-        </div>
-        <button class="icon-button" id="close-settings" type="button" aria-label="Close settings">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
-        </button>
-      </div>
-      <p id="settings-description">Your Cerebras API key is saved only in this browser and sent directly to Cerebras.</p>
-      <label for="api-key">Cerebras API key</label>
-      <div class="key-input-row">
-        <input id="api-key" name="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your API key">
-        <button class="key-visibility" id="toggle-key" type="button" aria-label="Show API key" aria-pressed="false">Show</button>
-      </div>
-      <div class="settings-actions">
-        <button class="remove-key-button" id="remove-key" type="button">Remove key</button>
-        <button class="save-key-button" type="submit">Save key</button>
-      </div>
-    </form>
-  </dialog>
 
   <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
 </body>

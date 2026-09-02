@@ -14,7 +14,6 @@
     apiKey: document.querySelector("#api-key"),
     apiState: document.querySelector("#api-state"),
     chatStage: document.querySelector("#chat-stage"),
-    closeSettings: document.querySelector("#close-settings"),
     closeSidebar: document.querySelector("#close-sidebar"),
     composer: document.querySelector("#composer"),
     emptyState: document.querySelector("#empty-state"),
@@ -22,19 +21,14 @@
     historyList: document.querySelector("#history-list"),
     messages: document.querySelector("#messages"),
     model: document.querySelector("#model"),
-    openSettings: document.querySelector("#open-settings"),
     newChat: document.querySelector("#new-chat"),
     openSidebar: document.querySelector("#open-sidebar"),
     prompt: document.querySelector("#prompt"),
-    removeKey: document.querySelector("#remove-key"),
     send: document.querySelector("#send"),
     sidebar: document.querySelector("#sidebar"),
-    settingsDialog: document.querySelector("#settings-dialog"),
-    settingsForm: document.querySelector("#settings-form"),
     sidebarScrim: document.querySelector("#sidebar-scrim"),
     suggestions: document.querySelector("#suggestions"),
     toast: document.querySelector("#toast"),
-    toggleKey: document.querySelector("#toggle-key"),
   };
 
   let dbPromise;
@@ -75,8 +69,7 @@
   function setApiState() {
     const ready = hasApiKey();
     elements.apiState.className = `api-state ${ready ? "ready" : "missing"}`;
-    elements.apiState.lastElementChild.textContent = ready ? "API key configured" : "API key required";
-    elements.removeKey.disabled = !ready;
+    elements.apiState.lastElementChild.textContent = ready ? "Saved" : "Paste key";
   }
 
   function storeApiKey(apiKey) {
@@ -91,19 +84,6 @@
     } catch { /* The source key remains available for this session. */ }
   }
 
-  function openSettings() {
-    elements.apiKey.value = getApiKey();
-    elements.apiKey.type = "password";
-    elements.toggleKey.textContent = "Show";
-    elements.toggleKey.setAttribute("aria-label", "Show API key");
-    elements.toggleKey.setAttribute("aria-pressed", "false");
-    elements.settingsDialog.showModal();
-    elements.apiKey.focus();
-  }
-
-  function closeSettings() {
-    elements.settingsDialog.close();
-  }
 
   function showToast(message) {
     window.clearTimeout(toastTimer);
@@ -490,8 +470,8 @@
 
   async function sendMessage(text) {
     if (!hasApiKey()) {
-      showToast("Add your Cerebras API key in settings.");
-      openSettings();
+      showToast("Paste your Cerebras API key in the top bar.");
+      elements.apiKey.focus();
       return;
     }
 
@@ -606,50 +586,17 @@
   });
 
   elements.newChat.addEventListener("click", startNewChat);
-  elements.openSettings.addEventListener("click", openSettings);
-  elements.closeSettings.addEventListener("click", closeSettings);
-  elements.settingsDialog.addEventListener("close", () => {
-    elements.apiKey.value = "";
-    elements.apiKey.type = "password";
-    elements.toggleKey.textContent = "Show";
-    elements.toggleKey.setAttribute("aria-label", "Show API key");
-    elements.toggleKey.setAttribute("aria-pressed", "false");
-  });
-  elements.toggleKey.addEventListener("click", () => {
-    const showing = elements.apiKey.type === "text";
-    elements.apiKey.type = showing ? "password" : "text";
-    elements.toggleKey.textContent = showing ? "Show" : "Hide";
-    elements.toggleKey.setAttribute("aria-label", `${showing ? "Show" : "Hide"} API key`);
-    elements.toggleKey.setAttribute("aria-pressed", String(!showing));
-    elements.apiKey.focus();
-  });
-  elements.settingsForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const apiKey = elements.apiKey.value.trim();
-    if (!isValidApiKey(apiKey)) {
-      showToast("Enter a valid Cerebras API key.");
-      elements.apiKey.focus();
-      return;
-    }
+  elements.apiKey.addEventListener("input", () => {
     try {
-      storeApiKey(apiKey);
+      const apiKey = elements.apiKey.value.trim();
+      if (apiKey) storeApiKey(apiKey);
+      else {
+        localStorage.removeItem(API_KEY_STORAGE);
+        localStorage.setItem(API_KEY_STATUS_STORAGE, "removed");
+      }
       setApiState();
-      closeSettings();
-      showToast("API key saved in this browser.");
     } catch (error) {
       showToast(`API key could not be saved: ${error.message}`);
-    }
-  });
-  elements.removeKey.addEventListener("click", () => {
-    try {
-      localStorage.removeItem(API_KEY_STORAGE);
-      localStorage.setItem(API_KEY_STATUS_STORAGE, "removed");
-      elements.apiKey.value = "";
-      setApiState();
-      showToast("API key removed from this browser.");
-      elements.apiKey.focus();
-    } catch (error) {
-      showToast(`API key could not be removed: ${error.message}`);
     }
   });
   elements.openSidebar.addEventListener("click", () => {
@@ -668,6 +615,7 @@
 
   async function initialize() {
     migrateConfiguredApiKey();
+    elements.apiKey.value = getApiKey();
     setApiState();
     const preferredModel = config.defaultModel || "gpt-oss-120b";
     if (![...elements.model.options].some((option) => option.value === preferredModel)) {

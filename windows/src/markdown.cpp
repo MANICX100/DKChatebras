@@ -154,6 +154,51 @@ bool StripListPrefix(std::wstring& line) {
     return false;
 }
 
+std::wstring Trim(const std::wstring& value) {
+    const size_t first = value.find_first_not_of(L" \t");
+    if (first == std::wstring::npos) return L"";
+    const size_t last = value.find_last_not_of(L" \t");
+    return value.substr(first, last - first + 1);
+}
+
+bool IsTableSeparator(const std::wstring& line) {
+    std::wstring value = Trim(line);
+    if (!value.empty() && value.front() == L'|') value.erase(value.begin());
+    if (!value.empty() && value.back() == L'|') value.pop_back();
+    size_t start = 0;
+    int columns = 0;
+    while (start <= value.size()) {
+        const size_t end = value.find(L'|', start);
+        std::wstring cell = Trim(value.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start));
+        if (!cell.empty() && cell.front() == L':') cell.erase(cell.begin());
+        if (!cell.empty() && cell.back() == L':') cell.pop_back();
+        cell = Trim(cell);
+        if (cell.size() < 3 || cell.find_first_not_of(L'-') != std::wstring::npos) return false;
+        ++columns;
+        if (end == std::wstring::npos) break;
+        start = end + 1;
+    }
+    return columns > 0;
+}
+
+void ParseTableRow(const std::wstring& line, std::wstring& output, std::vector<Span>& spans, bool header) {
+    std::wstring value = Trim(line);
+    if (!value.empty() && value.front() == L'|') value.erase(value.begin());
+    if (!value.empty() && value.back() == L'|') value.pop_back();
+    const size_t rowStart = output.size();
+    size_t start = 0;
+    bool first = true;
+    while (start <= value.size()) {
+        const size_t end = value.find(L'|', start);
+        if (!first) output += L'\t';
+        ParseInline(Trim(value.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start)), output, spans);
+        first = false;
+        if (end == std::wstring::npos) break;
+        start = end + 1;
+    }
+    if (header) AddSpan(spans, rowStart, output.size(), Style::Bold);
+}
+
 Style HeadingStyle(size_t level) {
     switch (level) {
     case 1: return Style::Heading1;
@@ -182,6 +227,7 @@ void RenderMarkdown(HWND richEdit, const std::wstring& markdown, bool darkMode) 
     std::wstring output;
     std::vector<Span> spans;
     bool codeBlock = false;
+    bool tableMode = false;
     size_t position = 0;
 
     while (position <= markdown.size()) {
@@ -191,18 +237,36 @@ void RenderMarkdown(HWND richEdit, const std::wstring& markdown, bool darkMode) 
         std::wstring line = markdown.substr(position, end - position);
         if (!line.empty() && line.back() == L'\r') line.pop_back();
 
-        const std::wstring trimmed = line.substr(line.find_first_not_of(L" \t") == std::wstring::npos ? line.size() : line.find_first_not_of(L" \t"));
+        std::wstring nextLine;
+        if (!last) {
+            const size_t nextStart = end + 1;
+            size_t nextEnd = markdown.find(L'\n', nextStart);
+            if (nextEnd == std::wstring::npos) nextEnd = markdown.size();
+            nextLine = markdown.substr(nextStart, nextEnd - nextStart);
+            if (!nextLine.empty() && nextLine.back() == L'\r') nextLine.pop_back();
+        }
+        const bool beginsTable = line.find(L'|') != std::wstring::npos && IsTableSeparator(nextLine);
+        const bool tableRow = line.find(L'|') != std::wstring::npos && (tableMode || beginsTable);
+        const std::wstring trimmed = Trim(line);
         if (trimmed.rfind(L"```", 0) == 0 || trimmed.rfind(L"~~~", 0) == 0) {
             codeBlock = !codeBlock;
         } else if (codeBlock) {
             const size_t start = output.size();
             output += line;
             AddSpan(spans, start, output.size(), Style::CodeBlock);
-            if (!last) output += L"\r\n";
+            if (!last) output += L'\r';
+        } else if (tableMode && IsTableSeparator(line)) {
+            // The GFM separator row controls table structure but is not displayed.
+        } else if (tableRow) {
+            ParseTableRow(line, output, spans, beginsTable);
+            if (!last) output += L'\r';
+            tableMode = true;
         } else if (IsHorizontalRule(line)) {
+            tableMode = false;
             output += L"────────────────────────────────────────";
-            if (!last) output += L"\r\n";
+            if (!last) output += L'\r';
         } else {
+            tableMode = false;
             size_t heading = 0;
             while (heading < line.size() && heading < 6 && line[heading] == L'#') ++heading;
             if (heading == 0 || heading >= line.size() || !iswspace(line[heading])) heading = 0;
@@ -220,7 +284,7 @@ void RenderMarkdown(HWND richEdit, const std::wstring& markdown, bool darkMode) 
             ParseInline(heading ? line.substr(heading + 1) : line, output, spans);
             if (heading) AddSpan(spans, start, output.size(), HeadingStyle(heading));
             if (quote) AddSpan(spans, start, output.size(), Style::Quote);
-            if (!last) output += L"\r\n";
+            if (!last) output += L'\r';
         }
         if (last) break;
         position = end + 1;
