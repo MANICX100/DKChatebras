@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#080b0f">
+  <meta name="description" content="DKChatebras — a fast, local Cerebras chat client.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.cerebras.ai; img-src 'self' data:; style-src 'self'; script-src 'self';">
+  <title>DKChatebras</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Chat history">
+      <div class="brand-row">
+        <a class="brand" href="#" aria-label="DKChatebras home">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>DKChatebras</span>
+        </a>
+        <button class="icon-button mobile-only" id="close-sidebar" type="button" aria-label="Close history">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+
+      <button class="new-chat-button" id="new-chat" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        New conversation
+        <kbd>⌘ K</kbd>
+      </button>
+
+      <div class="history-heading">
+        <span>Recent</span>
+        <span id="history-count">0</span>
+      </div>
+      <nav class="history-list" id="history-list" aria-label="Recent conversations"></nav>
+
+      <div class="sidebar-footer">
+        <span class="status-dot" aria-hidden="true"></span>
+        <div><strong>Local first</strong><small>History stays in this browser</small></div>
+      </div>
+    </aside>
+
+    <div class="sidebar-scrim" id="sidebar-scrim" hidden></div>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <button class="icon-button mobile-only" id="open-sidebar" type="button" aria-label="Open history">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <div class="model-control">
+          <label for="model">Model</label>
+          <select id="model" aria-label="Cerebras model">
+            <option value="gpt-oss-120b">GPT OSS 120B</option>
+            <option value="gemma-4-31b">Gemma 4 31B</option>
+          </select>
+        </div>
+        <div class="topbar-actions">
+          <div class="api-state" id="api-state" role="status">
+            <span></span><span>Checking key</span>
+          </div>
+          <button class="icon-button" id="open-settings" type="button" aria-label="Open API key settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15a1.7 1.7 0 0 0-1.55-1H3v-4h.08A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63h.01A1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9v.01A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="chat-stage" id="chat-stage" aria-label="Conversation">
+        <div class="empty-state" id="empty-state">
+          <div class="hero-orbit" aria-hidden="true">
+            <div class="orbit-ring"></div>
+            <div class="hero-mark"><i></i><i></i><i></i></div>
+          </div>
+          <p class="eyebrow">DKChatebras</p>
+          <h1>What will you<br><em>create today?</em></h1>
+          <p class="hero-copy">A focused interface for the world’s fastest AI inference. No accounts, no telemetry, no distractions.</p>
+          <div class="suggestion-grid" id="suggestions">
+            <button type="button" data-prompt="Explain a complex topic to me in simple terms">Explain a concept <span>→</span></button>
+            <button type="button" data-prompt="Help me brainstorm creative ideas for a new project">Brainstorm ideas <span>→</span></button>
+            <button type="button" data-prompt="Review this code and suggest improvements:\n\n">Review some code <span>→</span></button>
+          </div>
+        </div>
+        <div class="messages" id="messages" aria-live="polite"></div>
+      </section>
+
+      <footer class="composer-wrap">
+        <form class="composer" id="composer">
+          <textarea id="prompt" rows="1" placeholder="Message DKChatebras…" aria-label="Message DKChatebras" autocomplete="off"></textarea>
+          <div class="composer-bottom">
+            <span class="composer-hint"><kbd>Enter</kbd> send · <kbd>Shift Enter</kbd> new line</span>
+            <button class="send-button" id="send" type="submit" aria-label="Send message">
+              <svg class="send-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 7-7 7 7M12 5v14"/></svg>
+              <svg class="stop-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+            </button>
+          </div>
+        </form>
+        <p class="disclaimer">Responses can be inaccurate. Verify important information.</p>
+      </footer>
+    </main>
+  </div>
+
+  <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title" aria-describedby="settings-description">
+    <form class="settings-form" id="settings-form">
+      <div class="settings-heading">
+        <div class="settings-title-group">
+          <p class="eyebrow">DKChatebras</p>
+          <h2 id="settings-title">API key settings</h2>
+        </div>
+        <button class="icon-button" id="close-settings" type="button" aria-label="Close settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p id="settings-description">Your Cerebras API key is saved only in this browser and sent directly to Cerebras.</p>
+      <label for="api-key">Cerebras API key</label>
+      <div class="key-input-row">
+        <input id="api-key" name="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your API key">
+        <button class="key-visibility" id="toggle-key" type="button" aria-label="Show API key" aria-pressed="false">Show</button>
+      </div>
+      <div class="settings-actions">
+        <button class="remove-key-button" id="remove-key" type="button">Remove key</button>
+        <button class="save-key-button" type="submit">Save key</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+</body>
+</html>

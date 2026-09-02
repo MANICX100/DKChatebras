@@ -1,0 +1,6 @@
+# Local editor and OS files
+.DS_Store
+Thumbs.db
+/NUL
+.vscode/
+.zed/

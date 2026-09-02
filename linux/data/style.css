@@ -1,0 +1,36 @@
+window {
+  font-feature-settings: "kern";
+}
+
+.message-card {
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.user-message {
+  background-color: alpha(@accent_bg_color, 0.16);
+  margin-left: 72px;
+}
+
+.assistant-message {
+  background-color: alpha(@card_bg_color, 0.82);
+  box-shadow: 0 1px 2px alpha(black, 0.12);
+  margin-right: 36px;
+}
+
+.message-text,
+.message-text text {
+  background: transparent;
+}
+
+.composer {
+  background-color: @card_bg_color;
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 1px 4px alpha(black, 0.18);
+}
+
+.composer textview,
+.composer textview text {
+  background: transparent;
+}

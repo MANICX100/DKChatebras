@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.dkchatebras.DKChatebras</id>
+  <name>DKChatebras</name>
+  <summary>Native GNOME client for Cerebras chat models</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>DKChatebras is a native GTK and libadwaita chat client that streams responses directly from the Cerebras API.</p>
+    <p>It stores the API key in Secret Service, keeps local per-chat history, and renders completed responses as native formatted text.</p>
+  </description>
+  <launchable type="desktop-id">io.github.dkchatebras.DKChatebras.desktop</launchable>
+  <provides>
+    <binary>dkchatebras</binary>
+  </provides>
+  <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </recommends>
+  <content_rating type="oars-1.1" />
+  <developer id="io.github.dkchatebras">
+    <name>DKChatebras Contributors</name>
+  </developer>
+  <url type="homepage">https://cerebras.ai/</url>
+  <releases>
+    <release version="1.0.0" date="2026-09-02">
+      <description><p>Initial Fedora GNOME release.</p></description>
+    </release>
+  </releases>
+</component>

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=DKChatebras
+Comment=Chat with Cerebras models
+Exec=dkchatebras
+Icon=io.github.dkchatebras.DKChatebras
+Terminal=false
+Type=Application
+Categories=Network;Chat;GNOME;GTK;
+Keywords=AI;Cerebras;Chat;LLM;
+StartupNotify=true
+DBusActivatable=false
