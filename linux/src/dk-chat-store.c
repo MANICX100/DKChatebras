@@ -53,7 +53,7 @@ dk_chat_store_metadata_from_chat(JsonObject *chat)
   DkChatMetadata *metadata = g_new0(DkChatMetadata, 1);
   metadata->id = g_strdup(json_object_get_string_member(chat, "id"));
   metadata->title = g_strdup(json_object_get_string_member_with_default(chat, "title", "New Chat"));
-  metadata->model = g_strdup(json_object_get_string_member_with_default(chat, "model", "llama-3.3-70b"));
+  metadata->model = g_strdup(json_object_get_string_member_with_default(chat, "model", "gpt-oss-120b"));
   metadata->updated_at = json_object_get_int_member_with_default(chat, "updated_at", 0);
   return metadata;
 }
@@ -88,7 +88,7 @@ dk_chat_store_load_index(GError **error)
     DkChatMetadata *metadata = g_new0(DkChatMetadata, 1);
     metadata->id = g_strdup(json_object_get_string_member(object, "id"));
     metadata->title = g_strdup(json_object_get_string_member_with_default(object, "title", "New Chat"));
-    metadata->model = g_strdup(json_object_get_string_member_with_default(object, "model", "llama-3.3-70b"));
+    metadata->model = g_strdup(json_object_get_string_member_with_default(object, "model", "gpt-oss-120b"));
     metadata->updated_at = json_object_get_int_member_with_default(object, "updated_at", 0);
     g_ptr_array_add(items, metadata);
   }

@@ -13,6 +13,7 @@ struct _DkCerebrasClient {
   GInputStream *stream;
   GCancellable *cancellable;
   GString *pending;
+  GString *event_data;
   DkCerebrasChunkFunc chunk_cb;
   DkCerebrasDoneFunc done_cb;
   gpointer user_data;
@@ -43,6 +44,7 @@ finish_stream(DkCerebrasClient *self, const GError *error)
   g_clear_object(&self->message);
   g_clear_object(&self->cancellable);
   g_clear_pointer(&self->pending, free_string);
+  g_clear_pointer(&self->event_data, free_string);
   self->chunk_cb = NULL;
   self->done_cb = NULL;
   self->user_data = NULL;
@@ -86,26 +88,67 @@ handle_data(DkCerebrasClient *self, const char *data, GError **error)
 }
 
 static gboolean
-process_pending(DkCerebrasClient *self, GError **error)
+dispatch_event(DkCerebrasClient *self, GError **error)
+{
+  if (self->event_data->len == 0)
+    return TRUE;
+
+  if (self->event_data->str[self->event_data->len - 1] == '\n')
+    g_string_truncate(self->event_data, self->event_data->len - 1);
+
+  g_autofree char *data = g_string_free(g_steal_pointer(&self->event_data), FALSE);
+  self->event_data = g_string_new(NULL);
+  return handle_data(self, data, error);
+}
+
+static gboolean
+process_line(DkCerebrasClient *self, const char *line, GError **error)
+{
+  if (*line == '\0')
+    return dispatch_event(self, error);
+
+  if (g_str_has_prefix(line, "data:")) {
+    const char *data = line + 5;
+    if (*data == ' ')
+      data++;
+    g_string_append(self->event_data, data);
+    g_string_append_c(self->event_data, '\n');
+  }
+
+  return TRUE;
+}
+
+static gboolean
+process_pending(DkCerebrasClient *self, gboolean flush, GError **error)
 {
   while (self->running) {
     char *newline = strchr(self->pending->str, '\n');
     if (newline == NULL)
       break;
 
-    gsize line_length = newline - self->pending->str;
+    gsize consumed = (gsize) (newline - self->pending->str) + 1;
+    gsize line_length = consumed - 1;
     if (line_length > 0 && self->pending->str[line_length - 1] == '\r')
       line_length--;
     g_autofree char *line = g_strndup(self->pending->str, line_length);
-    g_string_erase(self->pending, 0, (newline - self->pending->str) + 1);
+    g_string_erase(self->pending, 0, consumed);
 
-    if (g_str_has_prefix(line, "data:")) {
-      const char *data = line + 5;
-      while (*data == ' ')
-        data++;
-      if (!handle_data(self, data, error))
+    if (!process_line(self, line, error))
+      return *error == NULL;
+  }
+
+  if (flush && self->running) {
+    if (self->pending->len > 0) {
+      gsize line_length = self->pending->len;
+      if (self->pending->str[line_length - 1] == '\r')
+        line_length--;
+      g_autofree char *line = g_strndup(self->pending->str, line_length);
+      g_string_truncate(self->pending, 0);
+      if (!process_line(self, line, error))
         return *error == NULL;
     }
+    if (self->running && !dispatch_event(self, error))
+      return *error == NULL;
   }
 
   return TRUE;
@@ -124,10 +167,13 @@ on_read(GObject *source, GAsyncResult *result, gpointer user_data)
     gsize size = 0;
     const char *data = g_bytes_get_data(bytes, &size);
     if (size == 0) {
-      finish_stream(self, NULL);
+      if (!process_pending(self, TRUE, &error))
+        finish_stream(self, error);
+      else if (self->running)
+        finish_stream(self, NULL);
     } else {
       g_string_append_len(self->pending, data, size);
-      if (!process_pending(self, &error))
+      if (!process_pending(self, FALSE, &error))
         finish_stream(self, error);
       else if (self->running)
         read_next(self);
@@ -183,6 +229,7 @@ dk_cerebras_client_dispose(GObject *object)
   g_clear_object(&self->cancellable);
   g_clear_object(&self->session);
   g_clear_pointer(&self->pending, free_string);
+  g_clear_pointer(&self->event_data, free_string);
   G_OBJECT_CLASS(dk_cerebras_client_parent_class)->dispose(object);
 }
 
@@ -240,9 +287,11 @@ dk_cerebras_client_stream(DkCerebrasClient *self,
 
   self->message = soup_message_new("POST", API_URL);
   soup_message_headers_append(soup_message_get_request_headers(self->message), "Authorization", authorization);
+  soup_message_headers_append(soup_message_get_request_headers(self->message), "Accept", "text/event-stream");
   soup_message_set_request_body_from_bytes(self->message, "application/json", body);
   self->cancellable = g_cancellable_new();
   self->pending = g_string_new(NULL);
+  self->event_data = g_string_new(NULL);
   self->chunk_cb = chunk_cb;
   self->done_cb = done_cb;
   self->user_data = user_data;

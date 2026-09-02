@@ -20,6 +20,7 @@ configure_file(output: 'config.h', configuration: conf)
 
 subdir('src')
 subdir('data')
+subdir('tests')
 
 summary({
   'Version': meson.project_version(),

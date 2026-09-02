@@ -34,9 +34,8 @@ struct _DkWindow {
 G_DEFINE_FINAL_TYPE(DkWindow, dk_window, ADW_TYPE_APPLICATION_WINDOW)
 
 static const char *models[] = {
-  "llama-3.3-70b",
-  "llama3.1-8b",
   "gpt-oss-120b",
+  "gemma-4-31b",
   NULL,
 };
 
@@ -333,6 +332,15 @@ on_stream_done(const GError *error, gpointer user_data)
     dk_chat_store_append_message(self->current_chat, "assistant", self->stream_text->str);
     dk_markdown_render(self->stream_buffer, self->stream_text->str);
     save_current(self);
+  } else if (self->stream_buffer != NULL) {
+    g_autofree char *status = NULL;
+    if (error != NULL && !g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+      status = g_strdup_printf("Request failed: %s", error->message);
+    else if (error != NULL)
+      status = g_strdup("Generation stopped.");
+    else
+      status = g_strdup("Cerebras returned an empty response.");
+    dk_markdown_render(self->stream_buffer, status);
   }
 
   if (error != NULL && !g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
@@ -430,6 +438,7 @@ show_key_window(DkWindow *self)
   gtk_widget_add_css_class(description, "dim-label");
   gtk_password_entry_set_show_peek_icon(self->key_entry, TRUE);
   gtk_widget_set_hexpand(GTK_WIDGET(self->key_entry), TRUE);
+  g_object_set(self->key_entry, "activates-default", TRUE, NULL);
   gtk_widget_add_css_class(save, "suggested-action");
   gtk_widget_set_halign(save, GTK_ALIGN_END);
   gtk_widget_set_margin_top(box, 24);
@@ -441,8 +450,10 @@ show_key_window(DkWindow *self)
   gtk_box_append(GTK_BOX(box), GTK_WIDGET(self->key_entry));
   gtk_box_append(GTK_BOX(box), save);
   gtk_window_set_child(self->key_window, box);
+  gtk_window_set_default_widget(self->key_window, save);
   g_signal_connect(save, "clicked", G_CALLBACK(on_save_key), self);
   gtk_window_present(self->key_window);
+  gtk_widget_grab_focus(GTK_WIDGET(self->key_entry));
 }
 
 static void
