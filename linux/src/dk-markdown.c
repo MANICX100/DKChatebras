@@ -680,12 +680,8 @@ strip_math(const char *segment, gsize segment_length)
     while (i < length) {
       const char c = text[i];
 
-      if (c == '<' && (gsize) html_break_length(text + i, text + length) > 0) {
-        gsize skip = html_break_length(text + i, text + length);
-        g_string_append_c(out, '\n');
-        i += skip;
-        continue;
-      }
+      /* <br> tags are left intact here; render_inline converts them to line
+       * breaks after block parsing, so table rows are not split apart. */
       if (c == '\\' && i + 1 < length) {
         const char next = text[i + 1];
         if (g_ascii_isalpha(next)) {
