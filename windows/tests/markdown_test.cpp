@@ -27,7 +27,8 @@ int main() {
 
     const std::wstring markdown =
         L"plain first\n\nplain after breaks\n\n**bold only** and normal text\n\n"
-        L"| Name | Value |\n| :--- | ---: |\n| Alpha | **Yes** |\n| Beta | No |";
+        L"| Name | Value |\n| :--- | ---: |\n| Alpha | **Yes** |\n| Beta | risk one<br>risk two |\n\n"
+        L"Break-even: \\(\\frac{149}{50}=2.98\\) months";
     RenderMarkdown(edit, markdown, false);
 
     const int length = GetWindowTextLengthW(edit);
@@ -37,14 +38,20 @@ int main() {
 
     const bool syntaxRemoved = rendered.find(L"**") == std::wstring::npos &&
                                rendered.find(L'|') == std::wstring::npos &&
-                               rendered.find(L":---") == std::wstring::npos;
+                               rendered.find(L":---") == std::wstring::npos &&
+                               rendered.find(L"<br") == std::wstring::npos &&
+                               rendered.find(L"\\frac") == std::wstring::npos &&
+                               rendered.find(L"\\(") == std::wstring::npos &&
+                               rendered.find(L"149\u204450") != std::wstring::npos &&
+                               rendered.find(L"risk one") != std::wstring::npos &&
+                               rendered.find(L"risk two") != std::wstring::npos;
     const bool stylesCorrect = HasEffect(edit, L"bold only", CFE_BOLD) &&
                                HasEffect(edit, L"Name", CFE_BOLD) &&
                                HasEffect(edit, L"Yes", CFE_BOLD) &&
                                !HasEffect(edit, L"plain after breaks", CFE_BOLD) &&
                                !HasEffect(edit, L"normal text", CFE_BOLD) &&
                                !HasEffect(edit, L"Alpha", CFE_BOLD) &&
-                               !HasEffect(edit, L"No", CFE_BOLD);
+                               !HasEffect(edit, L"risk one", CFE_BOLD);
 
     DestroyWindow(edit);
     if (!syntaxRemoved || !stylesCorrect) {

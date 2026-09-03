@@ -116,7 +116,7 @@ public final class MainActivity extends Activity {
         root.addView(scrim, match());
 
         drawer = buildDrawer();
-        drawer.setVisibility(View.GONE);
+        drawer.setVisibility(View.INVISIBLE);
         FrameLayout.LayoutParams drawerParams = new FrameLayout.LayoutParams(Math.min(dp(340), getResources().getDisplayMetrics().widthPixels * 86 / 100), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START);
         root.addView(drawer, drawerParams);
     }
@@ -300,8 +300,7 @@ public final class MainActivity extends Activity {
             if (assistant.content.isEmpty()) assistant.content = "Request failed: " + error;
             toast(error);
         } else if (assistant.content.isEmpty()) assistant.content = "Generation stopped.";
-        view.setText(MarkdownRenderer.render(assistant.content));
-        view.setMovementMethod(LinkMovementMethod.getInstance());
+        applyMarkdownAsync(view, assistant.content);
         conversation.updatedAt = System.currentTimeMillis();
         setGenerating(false); refreshHistory(); saveCurrent(); scrollToBottom();
     }
@@ -313,6 +312,17 @@ public final class MainActivity extends Activity {
         if (!streamingView.isAttachedToWindow() || now - lastStreamHapticAt < STREAM_HAPTIC_INTERVAL_MS) return;
         lastStreamHapticAt = now;
         streamingView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+    }
+
+    private void applyMarkdownAsync(TextView view, String content) {
+        executor.execute(() -> {
+            CharSequence rendered = MarkdownRenderer.render(content);
+            runOnUiThread(() -> {
+                if (destroyed || !view.isAttachedToWindow()) return;
+                view.setText(rendered);
+                view.setMovementMethod(LinkMovementMethod.getInstance());
+            });
+        });
     }
 
     private void saveCurrent() {
@@ -342,8 +352,8 @@ public final class MainActivity extends Activity {
         TextView text = new TextView(this); text.setTag("message"); text.setTextColor(ON_SURFACE); text.setTextSize(16); text.setLineSpacing(0, 1.12f);
         text.setTextIsSelectable(true); text.setPadding(dp(16), dp(12), dp(16), dp(12)); text.setMaxWidth(getResources().getDisplayMetrics().widthPixels * 86 / 100);
         text.setBackground(roundRect(user ? PRIMARY_CONTAINER : Color.WHITE, user ? 24 : 18, Color.TRANSPARENT, 0));
-        if (user || (generating && message == messages.get(messages.size() - 1))) text.setText(message.content);
-        else { text.setText(MarkdownRenderer.render(message.content)); text.setMovementMethod(LinkMovementMethod.getInstance()); }
+        text.setText(message.content);
+        if (!user && !(generating && message == messages.get(messages.size() - 1))) applyMarkdownAsync(text, message.content);
         row.addView(text, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         rowParams.setMargins(0, dp(5), 0, dp(5)); row.setLayoutParams(rowParams); return row;
@@ -413,8 +423,24 @@ public final class MainActivity extends Activity {
 
     private void setLoadingState(String label) { messageList.removeAllViews(); TextView loading = new TextView(this); loading.setText(label); loading.setTextColor(OUTLINE); loading.setGravity(Gravity.CENTER); messageList.addView(loading, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(220))); }
     private void scrollToBottom() { messageScroll.post(() -> messageScroll.fullScroll(View.FOCUS_DOWN)); }
-    private void openDrawer() { refreshHistory(); scrim.setVisibility(View.VISIBLE); drawer.setVisibility(View.VISIBLE); drawer.setTranslationX(-drawer.getWidth()); drawer.animate().translationX(0).setDuration(180).start(); }
-    private void closeDrawer() { drawer.animate().translationX(-drawer.getWidth()).setDuration(150).withEndAction(() -> { drawer.setVisibility(View.GONE); scrim.setVisibility(View.GONE); }).start(); }
+    private void openDrawer() {
+        refreshHistory();
+        int width = drawer.getWidth() > 0 ? drawer.getWidth() : ((FrameLayout.LayoutParams) drawer.getLayoutParams()).width;
+        drawer.setTranslationX(-width);
+        drawer.setVisibility(View.VISIBLE);
+        scrim.setAlpha(0f);
+        scrim.setVisibility(View.VISIBLE);
+        scrim.animate().alpha(1f).setDuration(180).start();
+        drawer.animate().translationX(0).setDuration(180).start();
+    }
+    private void closeDrawer() {
+        if (drawer.getVisibility() != View.VISIBLE) return;
+        scrim.animate().alpha(0f).setDuration(150).start();
+        drawer.animate().translationX(-drawer.getWidth()).setDuration(150).withEndAction(() -> {
+            drawer.setVisibility(View.INVISIBLE);
+            scrim.setVisibility(View.GONE);
+        }).start();
+    }
     private String titleFrom(String text) { String oneLine = text.replace('\n', ' ').trim(); return oneLine.length() <= 42 ? oneLine : oneLine.substring(0, 39) + "…"; }
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
     private void reportStorageError(Exception error) { runOnUiThread(() -> toast("Storage error: " + error.getMessage())); }

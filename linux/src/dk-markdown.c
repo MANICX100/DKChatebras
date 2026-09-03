@@ -620,11 +620,50 @@ dk_markdown_setup_buffer(GtkTextBuffer *buffer)
   gtk_text_buffer_create_tag(buffer, "table-header", "weight", PANGO_WEIGHT_BOLD, "underline", PANGO_UNDERLINE_SINGLE, NULL);
 }
 
+/* Converts model-emitted inline HTML breaks and common LaTeX to plain text. */
+static char *
+normalize_markdown(const char *markdown)
+{
+  static const struct { const char *from; const char *to; } replacements[] = {
+    { "<br />", "\n" }, { "<br/>", "\n" }, { "<br>", "\n" },
+    { "<BR />", "\n" }, { "<BR/>", "\n" }, { "<BR>", "\n" },
+    { "\\(", "" }, { "\\)", "" }, { "\\[", "" }, { "\\]", "" },
+    { "\\times", "\303\227" }, { "\\cdot", "\302\267" },
+    { "\\approx", "\342\211\210" }, { "\\le", "\342\211\244" }, { "\\ge", "\342\211\245" },
+    { "\\pm", "\302\261" }, { "\\rightarrow", "\342\206\222" }, { "\\to", "\342\206\222" },
+    { "\\text", "" }, { "\\mathrm", "" },
+  };
+
+  g_autoptr(GRegex) fraction = g_regex_new("\\\\[dt]?frac\\{([^{}]+)\\}\\{([^{}]+)\\}",
+                                           G_REGEX_DEFAULT, G_REGEX_MATCH_DEFAULT, NULL);
+  char *text = fraction != NULL
+      ? g_regex_replace(fraction, markdown, -1, 0, "\\1\342\201\204\\2", G_REGEX_MATCH_DEFAULT, NULL)
+      : NULL;
+  if (text == NULL)
+    text = g_strdup(markdown);
+
+  for (gsize i = 0; i < G_N_ELEMENTS(replacements); i++) {
+    GString *builder = g_string_new(NULL);
+    const char *cursor = text;
+    const char *found;
+    while ((found = strstr(cursor, replacements[i].from)) != NULL) {
+      g_string_append_len(builder, cursor, found - cursor);
+      g_string_append(builder, replacements[i].to);
+      cursor = found + strlen(replacements[i].from);
+    }
+    g_string_append(builder, cursor);
+    g_free(text);
+    text = g_string_free(builder, FALSE);
+  }
+  return text;
+}
+
 void
 dk_markdown_render(GtkTextBuffer *buffer, const char *markdown)
 {
   g_autofree char *valid = g_utf8_make_valid(markdown != NULL ? markdown : "", -1);
-  g_auto(GStrv) lines = g_strsplit(valid, "\n", -1);
+  g_autofree char *normalized = normalize_markdown(valid);
+  g_auto(GStrv) lines = g_strsplit(normalized, "\n", -1);
   g_autoptr(GString) text = g_string_new(NULL);
   g_autoptr(GArray) ranges = g_array_new(FALSE, FALSE, sizeof(TextRange));
   Renderer renderer = { text, ranges, 0, 0 };

@@ -38,7 +38,7 @@ final class MarkdownRenderer {
 
     static SpannableStringBuilder render(String markdown) {
         SpannableStringBuilder output = new SpannableStringBuilder();
-        String[] lines = markdown.replace("\r\n", "\n").replace('\r', '\n').split("\n", -1);
+        String[] lines = normalize(markdown).split("\n", -1);
         char fenceMarker = 0;
         int fenceLength = 0;
         int codeStart = -1;
@@ -293,6 +293,25 @@ final class MarkdownRenderer {
         int end = position;
         while (end < to && text.charAt(end) == marker) end++;
         return end - position;
+    }
+
+    /** Converts model-emitted inline HTML breaks and common LaTeX to plain text. */
+    static String normalize(String markdown) {
+        String text = markdown.replace("\r\n", "\n").replace('\r', '\n');
+        text = text.replaceAll("(?i)<br\\s*/?>", "\n");
+        StringBuffer fractions = new StringBuffer(text.length());
+        java.util.regex.Matcher fraction = java.util.regex.Pattern
+                .compile("\\\\[dt]?frac\\{([^{}]+)\\}\\{([^{}]+)\\}").matcher(text);
+        while (fraction.find())
+            fraction.appendReplacement(fractions, java.util.regex.Matcher.quoteReplacement(fraction.group(1) + "\u2044" + fraction.group(2)));
+        fraction.appendTail(fractions);
+        text = fractions.toString();
+        text = text.replaceAll("\\\\[\\[\\]()]", "");
+        text = text.replace("\\times", "\u00d7").replace("\\cdot", "\u00b7")
+                .replace("\\approx", "\u2248").replace("\\le", "\u2264").replace("\\ge", "\u2265")
+                .replace("\\pm", "\u00b1").replace("\\rightarrow", "\u2192").replace("\\to", "\u2192")
+                .replace("\\text", "").replace("\\mathrm", "");
+        return text;
     }
 
     private static int headingLevel(String line) {

@@ -19,6 +19,7 @@ constexpr wchar_t kAppClass[] = L"DKChatebras.MainWindow";
 constexpr wchar_t kSettingsClass[] = L"DKChatebras.SettingsWindow";
 constexpr UINT WM_STREAM_CHUNK = WM_APP + 1;
 constexpr UINT WM_STREAM_DONE = WM_APP + 2;
+constexpr UINT WM_SAVE_ERROR = WM_APP + 3;
 enum : int { ID_CHAT = 100, ID_INPUT, ID_SEND, ID_STOP, ID_NEW, ID_DELETE, ID_SETTINGS, ID_MODEL,
     ID_KEY = 200, ID_SAVE_KEY, ID_CANCEL_KEY };
 
@@ -200,9 +201,7 @@ public:
         SetWindowTextW(input_, L"");
         streamPrefix_ = BuildTranscript(false);
         SetRichEditPlainText(chat_, streamPrefix_);
-        std::wstring saveError;
-        if (!SaveConversation(currentId_, messages_, saveError))
-            MessageBoxW(window_, saveError.c_str(), L"DKChatebras storage", MB_ICONERROR);
+        SaveConversationAsync();
         streaming_ = true; stopRequested_ = false; SetUiStreaming(true);
         wchar_t modelText[64] = {}; GetWindowTextW(model_, modelText, 64);
         std::vector<ChatMessage> requestMessages = messages_; requestMessages.pop_back();
@@ -230,6 +229,7 @@ private:
     std::atomic_bool stopRequested_{false};
     std::atomic<void*> activeRequest_{nullptr};
     std::thread worker_;
+    std::thread saveWorker_;
     std::wstring apiKey_, currentId_, streamPrefix_;
     std::vector<ChatMessage> messages_;
     std::vector<ConversationSummary> summaries_;
@@ -301,6 +301,11 @@ private:
             if (header->idFrom == ID_CHAT && header->code == EN_LINK) OpenLink(*reinterpret_cast<ENLINK*>(lParam));
             break;
         }
+        case WM_SAVE_ERROR: {
+            std::unique_ptr<std::wstring> error(reinterpret_cast<std::wstring*>(lParam));
+            MessageBoxW(window_, error->c_str(), L"DKChatebras storage", MB_ICONERROR);
+            return 0;
+        }
         case WM_STREAM_CHUNK: {
             std::unique_ptr<std::wstring> chunk(reinterpret_cast<std::wstring*>(lParam));
             if (streaming_ && !messages_.empty()) { messages_.back().content += *chunk; AppendRichEditPlainText(chat_, *chunk); }
@@ -314,9 +319,7 @@ private:
                 if (!messages_.empty() && messages_.back().content.empty()) messages_.pop_back();
                 MessageBoxW(window_, result->error.c_str(), L"DKChatebras request", MB_ICONERROR);
             } else if (result->stopped && !messages_.empty() && messages_.back().content.empty()) messages_.pop_back();
-            std::wstring error;
-            if (!currentId_.empty() && !SaveConversation(currentId_, messages_, error))
-                MessageBoxW(window_, error.c_str(), L"DKChatebras storage", MB_ICONERROR);
+            if (!currentId_.empty()) SaveConversationAsync();
             RenderConversation(); RefreshSummaries(); FocusInput(); return 0;
         }
         case WM_CTLCOLORSTATIC: {
@@ -332,12 +335,23 @@ private:
         case WM_CLOSE:
             RequestStop();
             if (worker_.joinable()) worker_.join();
+            if (saveWorker_.joinable()) saveWorker_.join();
             DiscardPendingStreamMessages();
             DestroyWindow(window_);
             return 0;
         case WM_DESTROY: DeleteObject(uiFont_); DeleteObject(titleFont_); DeleteObject(inputBrush_); DeleteObject(chatBrush_); PostQuitMessage(0); return 0;
         }
         return DefWindowProcW(window_, msg, wParam, lParam);
+    }
+
+    void SaveConversationAsync() {
+        if (saveWorker_.joinable()) saveWorker_.join();
+        HWND target = window_;
+        saveWorker_ = std::thread([target, id = currentId_, snapshot = messages_] {
+            std::wstring error;
+            if (!SaveConversation(id, snapshot, error))
+                PostOwnedMessage(target, WM_SAVE_ERROR, std::make_unique<std::wstring>(error));
+        });
     }
 
     void RequestStop() {
@@ -347,8 +361,8 @@ private:
 
     void DiscardPendingStreamMessages() {
         MSG message{};
-        while (PeekMessageW(&message, window_, WM_STREAM_CHUNK, WM_STREAM_DONE, PM_REMOVE)) {
-            if (message.message == WM_STREAM_CHUNK)
+        while (PeekMessageW(&message, window_, WM_STREAM_CHUNK, WM_SAVE_ERROR, PM_REMOVE)) {
+            if (message.message == WM_STREAM_CHUNK || message.message == WM_SAVE_ERROR)
                 delete reinterpret_cast<std::wstring*>(message.lParam);
             else if (message.message == WM_STREAM_DONE)
                 delete reinterpret_cast<StreamResult*>(message.lParam);

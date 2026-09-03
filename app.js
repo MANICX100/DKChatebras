@@ -124,11 +124,22 @@
     return stage.scrollHeight - stage.scrollTop - stage.clientHeight < 48;
   }
 
+  // Converts common LaTeX emitted by models into readable plain text.
+  function normalizeLatex(source) {
+    return source
+      .replace(/\\[dt]?frac\{([^{}]+)\}\{([^{}]+)\}/g, "$1\u2044$2")
+      .replace(/\\[\[\]()]/g, "")
+      .replace(/\\times/g, "\u00d7").replace(/\\cdot/g, "\u00b7")
+      .replace(/\\approx/g, "\u2248").replace(/\\le\b/g, "\u2264").replace(/\\ge\b/g, "\u2265")
+      .replace(/\\pm/g, "\u00b1").replace(/\\rightarrow/g, "\u2192").replace(/\\to\b/g, "\u2192")
+      .replace(/\\(?:text|mathrm)\b/g, "");
+  }
+
   async function renderMarkdown(element, source) {
     try {
       await loadMarkdownRenderer();
       const shouldFollow = element.isConnected && isNearBottom();
-      const html = window.marked.parse(source, { gfm: true, breaks: true });
+      const html = window.marked.parse(normalizeLatex(source), { gfm: true, breaks: true });
       element.innerHTML = window.DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
       element.classList.add("markdown");
       if (shouldFollow && element.isConnected) requestAnimationFrame(scrollToBottom);

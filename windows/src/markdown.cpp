@@ -199,6 +199,70 @@ void ParseTableRow(const std::wstring& line, std::wstring& output, std::vector<S
     if (header) AddSpan(spans, rowStart, output.size(), Style::Bold);
 }
 
+void ReplaceAll(std::wstring& text, const std::wstring& from, const std::wstring& to) {
+    size_t position = 0;
+    while ((position = text.find(from, position)) != std::wstring::npos) {
+        text.replace(position, from.size(), to);
+        position += to.size();
+    }
+}
+
+bool EqualsIgnoreCase(const std::wstring& text, size_t position, const wchar_t* token) {
+    for (size_t i = 0; token[i] != L'\0'; ++i) {
+        if (position + i >= text.size() || towlower(text[position + i]) != token[i]) return false;
+    }
+    return true;
+}
+
+// Converts model-emitted inline HTML breaks and common LaTeX to plain text.
+std::wstring NormalizeMarkdown(const std::wstring& markdown) {
+    std::wstring text;
+    text.reserve(markdown.size());
+    for (size_t i = 0; i < markdown.size();) {
+        if (markdown[i] == L'<' && EqualsIgnoreCase(markdown, i, L"<br")) {
+            size_t close = markdown.find(L'>', i + 3);
+            if (close != std::wstring::npos && close - i <= 6) {
+                text += L"\r\n";
+                i = close + 1;
+                continue;
+            }
+        }
+        text += markdown[i++];
+    }
+
+    for (const wchar_t* macro : {L"\\frac", L"\\dfrac", L"\\tfrac"}) {
+        size_t position = 0;
+        while ((position = text.find(macro, position)) != std::wstring::npos) {
+            const size_t open1 = position + wcslen(macro);
+            if (open1 >= text.size() || text[open1] != L'{') { ++position; continue; }
+            const size_t close1 = text.find(L'}', open1 + 1);
+            if (close1 == std::wstring::npos || close1 + 1 >= text.size() || text[close1 + 1] != L'{') { ++position; continue; }
+            const size_t close2 = text.find(L'}', close1 + 2);
+            if (close2 == std::wstring::npos) { ++position; continue; }
+            const std::wstring replacement =
+                text.substr(open1 + 1, close1 - open1 - 1) + L"\u2044" + text.substr(close1 + 2, close2 - close1 - 2);
+            text.replace(position, close2 - position + 1, replacement);
+            position += replacement.size();
+        }
+    }
+
+    ReplaceAll(text, L"\\(", L"");
+    ReplaceAll(text, L"\\)", L"");
+    ReplaceAll(text, L"\\[", L"");
+    ReplaceAll(text, L"\\]", L"");
+    ReplaceAll(text, L"\\times", L"\u00d7");
+    ReplaceAll(text, L"\\cdot", L"\u00b7");
+    ReplaceAll(text, L"\\approx", L"\u2248");
+    ReplaceAll(text, L"\\le", L"\u2264");
+    ReplaceAll(text, L"\\ge", L"\u2265");
+    ReplaceAll(text, L"\\pm", L"\u00b1");
+    ReplaceAll(text, L"\\rightarrow", L"\u2192");
+    ReplaceAll(text, L"\\to", L"\u2192");
+    ReplaceAll(text, L"\\text", L"");
+    ReplaceAll(text, L"\\mathrm", L"");
+    return text;
+}
+
 Style HeadingStyle(size_t level) {
     switch (level) {
     case 1: return Style::Heading1;
@@ -223,7 +287,8 @@ void AppendRichEditPlainText(HWND richEdit, const std::wstring& text) {
     SendMessageW(richEdit, EM_SCROLLCARET, 0, 0);
 }
 
-void RenderMarkdown(HWND richEdit, const std::wstring& markdown, bool darkMode) {
+void RenderMarkdown(HWND richEdit, const std::wstring& source, bool darkMode) {
+    const std::wstring markdown = NormalizeMarkdown(source);
     std::wstring output;
     std::vector<Span> spans;
     bool codeBlock = false;
