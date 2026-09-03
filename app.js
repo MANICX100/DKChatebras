@@ -124,15 +124,99 @@
     return stage.scrollHeight - stage.scrollTop - stage.clientHeight < 48;
   }
 
-  // Converts common LaTeX emitted by models into readable plain text.
+  // Maps bare LaTeX macros to display text; wrapper macros map to "" and keep their argument.
+  const LATEX_SYMBOLS = {
+    times: "\u00d7", div: "\u00f7", cdot: "\u00b7", pm: "\u00b1", mp: "\u2213", approx: "\u2248",
+    le: "\u2264", leq: "\u2264", ge: "\u2265", geq: "\u2265", ne: "\u2260", neq: "\u2260",
+    sim: "~", propto: "\u221d", infty: "\u221e", to: "\u2192", rightarrow: "\u2192",
+    leftarrow: "\u2190", Rightarrow: "\u21d2", Leftarrow: "\u21d0", leftrightarrow: "\u2194",
+    sum: "\u03a3", prod: "\u03a0", int: "\u222b", sqrt: "\u221a", ldots: "\u2026", dots: "\u2026",
+    cdots: "\u22ef", quad: " ", qquad: "  ", left: "", right: "", text: "", mathrm: "",
+    mathbf: "", mathit: "", operatorname: "", displaystyle: "", boxed: "",
+    alpha: "\u03b1", beta: "\u03b2", gamma: "\u03b3", delta: "\u03b4", epsilon: "\u03b5",
+    zeta: "\u03b6", eta: "\u03b7", theta: "\u03b8", lambda: "\u03bb", mu: "\u03bc", nu: "\u03bd",
+    xi: "\u03be", pi: "\u03c0", rho: "\u03c1", sigma: "\u03c3", tau: "\u03c4", phi: "\u03c6",
+    chi: "\u03c7", psi: "\u03c8", omega: "\u03c9", Gamma: "\u0393", Delta: "\u0394", Theta: "\u0398",
+    Lambda: "\u039b", Pi: "\u03a0", Sigma: "\u03a3", Phi: "\u03a6", Psi: "\u03a8", Omega: "\u03a9",
+  };
+
+  function matchBrace(text, open) {
+    let depth = 0;
+    for (let j = open; j < text.length; j++) {
+      if (text[j] === "\\") { j++; continue; }
+      if (text[j] === "{") depth++;
+      else if (text[j] === "}" && --depth === 0) return j;
+    }
+    return -1;
+  }
+
+  // Generically unwraps LaTeX macros and scripts in prose text.
+  function stripMath(segment) {
+    let text = segment;
+    for (let pass = 0; pass < 8; pass++) {
+      let out = "";
+      let i = 0;
+      while (i < text.length) {
+        const c = text[i];
+        if (c === "\\" && i + 1 < text.length) {
+          const word = /^[A-Za-z]+/.exec(text.slice(i + 1));
+          if (word) {
+            const name = word[0];
+            const wordEnd = i + 1 + name.length;
+            if (text[wordEnd] === "{") {
+              const close = matchBrace(text, wordEnd);
+              if (close >= 0) {
+                const argument = text.slice(wordEnd + 1, close);
+                if ((name === "frac" || name === "dfrac" || name === "tfrac") && text[close + 1] === "{") {
+                  const close2 = matchBrace(text, close + 1);
+                  if (close2 >= 0) {
+                    out += `${argument}\u2044${text.slice(close + 2, close2)}`;
+                    i = close2 + 1;
+                    continue;
+                  }
+                }
+                out += (LATEX_SYMBOLS[name] ?? "") + argument;
+                i = close + 1;
+                continue;
+              }
+            }
+            if (name in LATEX_SYMBOLS) { out += LATEX_SYMBOLS[name]; i = wordEnd; continue; }
+            out += text.slice(i, wordEnd);
+            i = wordEnd;
+            continue;
+          }
+          if ("[]()".includes(text[i + 1])) { i += 2; continue; }
+          if (";,:!".includes(text[i + 1])) { out += " "; i += 2; continue; }
+        }
+        if ((c === "_" || c === "^") && text[i + 1] === "{") {
+          const close = matchBrace(text, i + 1);
+          if (close >= 0) {
+            const argument = text.slice(i + 2, close);
+            out += argument.length <= 3 ? argument : ` (${argument})`;
+            i = close + 1;
+            continue;
+          }
+        }
+        out += c;
+        i++;
+      }
+      out = out.replaceAll("$$", "");
+      if (out === text) break;
+      text = out;
+    }
+    return text;
+  }
+
+  // Applies stripMath outside fenced code blocks and inline code spans.
   function normalizeLatex(source) {
-    return source
-      .replace(/\\[dt]?frac\{([^{}]+)\}\{([^{}]+)\}/g, "$1\u2044$2")
-      .replace(/\\[\[\]()]/g, "")
-      .replace(/\\times/g, "\u00d7").replace(/\\cdot/g, "\u00b7")
-      .replace(/\\approx/g, "\u2248").replace(/\\le\b/g, "\u2264").replace(/\\ge\b/g, "\u2265")
-      .replace(/\\pm/g, "\u00b1").replace(/\\rightarrow/g, "\u2192").replace(/\\to\b/g, "\u2192")
-      .replace(/\\(?:text|mathrm)\b/g, "");
+    const lines = source.split("\n");
+    let fenced = false;
+    return lines.map((line) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) { fenced = !fenced; return line; }
+      if (fenced) return line;
+      return line.split("`").map((part, index) => (index % 2 === 0 ? stripMath(part) : part)).join("`");
+    }).join("\n");
   }
 
   async function renderMarkdown(element, source) {

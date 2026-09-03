@@ -28,7 +28,9 @@ int main() {
     const std::wstring markdown =
         L"plain first\n\nplain after breaks\n\n**bold only** and normal text\n\n"
         L"| Name | Value |\n| :--- | ---: |\n| Alpha | **Yes** |\n| Beta | risk one<br>risk two |\n\n"
-        L"Break-even: \\(\\frac{149}{50}=2.98\\) months";
+        L"Break-even: \\(\\frac{149}{50}=2.98\\) months\n\n"
+        L"\\[ \\underbrace{C_{r}\\times N}_{\\text{total rent}} \\;<\\; \\underbrace{P - R}_{\\text{net loss}} \\]\n\n"
+        L"Path stays: C:\\Users\\Dan and code stays: `a \\times b`";
     RenderMarkdown(edit, markdown, false);
 
     const int length = GetWindowTextLengthW(edit);
@@ -36,26 +38,51 @@ int main() {
     GetWindowTextW(edit, rendered.data(), length + 1);
     rendered.resize(static_cast<size_t>(length));
 
-    const bool syntaxRemoved = rendered.find(L"**") == std::wstring::npos &&
-                               rendered.find(L'|') == std::wstring::npos &&
-                               rendered.find(L":---") == std::wstring::npos &&
-                               rendered.find(L"<br") == std::wstring::npos &&
-                               rendered.find(L"\\frac") == std::wstring::npos &&
-                               rendered.find(L"\\(") == std::wstring::npos &&
-                               rendered.find(L"149\u204450") != std::wstring::npos &&
-                               rendered.find(L"risk one") != std::wstring::npos &&
-                               rendered.find(L"risk two") != std::wstring::npos;
-    const bool stylesCorrect = HasEffect(edit, L"bold only", CFE_BOLD) &&
-                               HasEffect(edit, L"Name", CFE_BOLD) &&
-                               HasEffect(edit, L"Yes", CFE_BOLD) &&
-                               !HasEffect(edit, L"plain after breaks", CFE_BOLD) &&
-                               !HasEffect(edit, L"normal text", CFE_BOLD) &&
-                               !HasEffect(edit, L"Alpha", CFE_BOLD) &&
-                               !HasEffect(edit, L"risk one", CFE_BOLD);
+    struct Check { const char* label; bool passed; };
+    const Check checks[] = {
+        {"no ** markers", rendered.find(L"**") == std::wstring::npos},
+        {"no pipes", rendered.find(L'|') == std::wstring::npos},
+        {"no separator row", rendered.find(L":---") == std::wstring::npos},
+        {"no <br>", rendered.find(L"<br") == std::wstring::npos},
+        {"no \\frac", rendered.find(L"\\frac") == std::wstring::npos},
+        {"no math delimiters", rendered.find(L"\\(") == std::wstring::npos},
+        {"fraction converted", rendered.find(L"149\u204450") != std::wstring::npos},
+        {"br split first", rendered.find(L"risk one") != std::wstring::npos},
+        {"br split second", rendered.find(L"risk two") != std::wstring::npos},
+        {"no underbrace", rendered.find(L"underbrace") == std::wstring::npos},
+        {"no subscripts", rendered.find(L"_{") == std::wstring::npos},
+        {"no ;<;", rendered.find(L";<;") == std::wstring::npos},
+        {"expression kept", rendered.find(L"Cr\u00d7 N") != std::wstring::npos},
+        {"annotation kept", rendered.find(L"(total rent)") != std::wstring::npos},
+        {"windows path kept", rendered.find(L"C:\\Users\\Dan") != std::wstring::npos},
+        {"inline code kept", rendered.find(L"a \\times b") != std::wstring::npos},
+        {"bold applied", HasEffect(edit, L"bold only", CFE_BOLD)},
+        {"header bold", HasEffect(edit, L"Name", CFE_BOLD)},
+        {"bold cell bold", HasEffect(edit, L"Yes", CFE_BOLD)},
+        {"paragraph not bold", !HasEffect(edit, L"plain after breaks", CFE_BOLD)},
+        {"inline text not bold", !HasEffect(edit, L"normal text", CFE_BOLD)},
+        {"body cell not bold", !HasEffect(edit, L"Alpha", CFE_BOLD)},
+        {"br cell not bold", !HasEffect(edit, L"risk one", CFE_BOLD)},
+    };
 
     DestroyWindow(edit);
-    if (!syntaxRemoved || !stylesCorrect) {
-        std::wcerr << L"Markdown regression failed\nRendered:\n" << rendered << L'\n';
+    bool allPassed = true;
+    for (const auto& check : checks) {
+        if (!check.passed) {
+            allPassed = false;
+            std::cout << "FAILED: " << check.label << '\n';
+        }
+    }
+    if (!allPassed) {
+        HANDLE dump = CreateFileW(L"markdown_test_output.txt", GENERIC_WRITE, 0, nullptr,
+                                  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (dump != INVALID_HANDLE_VALUE) {
+            DWORD written = 0;
+            const wchar_t bom = 0xFEFF;
+            WriteFile(dump, &bom, sizeof(bom), &written, nullptr);
+            WriteFile(dump, rendered.c_str(), static_cast<DWORD>(rendered.size() * sizeof(wchar_t)), &written, nullptr);
+            CloseHandle(dump);
+        }
         return 3;
     }
     std::cout << "Windows RichEdit Markdown regression passed\n";

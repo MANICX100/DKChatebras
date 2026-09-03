@@ -620,42 +620,197 @@ dk_markdown_setup_buffer(GtkTextBuffer *buffer)
   gtk_text_buffer_create_tag(buffer, "table-header", "weight", PANGO_WEIGHT_BOLD, "underline", PANGO_UNDERLINE_SINGLE, NULL);
 }
 
-/* Converts model-emitted inline HTML breaks and common LaTeX to plain text. */
+/* Maps bare LaTeX macros to display text; wrapper macros map to "" and keep their argument. */
+static const char *
+latex_symbol(const char *name, gsize length)
+{
+  static const struct { const char *name; const char *symbol; } table[] = {
+    { "times", "\303\227" }, { "div", "\303\267" }, { "cdot", "\302\267" },
+    { "pm", "\302\261" }, { "mp", "\342\210\223" }, { "approx", "\342\211\210" },
+    { "le", "\342\211\244" }, { "leq", "\342\211\244" }, { "ge", "\342\211\245" }, { "geq", "\342\211\245" },
+    { "ne", "\342\211\240" }, { "neq", "\342\211\240" }, { "sim", "~" }, { "propto", "\342\210\235" },
+    { "infty", "\342\210\236" }, { "to", "\342\206\222" }, { "rightarrow", "\342\206\222" },
+    { "leftarrow", "\342\206\220" }, { "Rightarrow", "\342\207\222" }, { "Leftarrow", "\342\207\220" },
+    { "leftrightarrow", "\342\206\224" }, { "sum", "\316\243" }, { "prod", "\316\240" },
+    { "int", "\342\210\253" }, { "sqrt", "\342\210\232" }, { "ldots", "\342\200\246" },
+    { "dots", "\342\200\246" }, { "cdots", "\342\213\257" }, { "quad", " " }, { "qquad", "  " },
+    { "left", "" }, { "right", "" }, { "text", "" }, { "mathrm", "" }, { "mathbf", "" },
+    { "mathit", "" }, { "operatorname", "" }, { "displaystyle", "" }, { "boxed", "" },
+    { "alpha", "\316\261" }, { "beta", "\316\262" }, { "gamma", "\316\263" }, { "delta", "\316\264" },
+    { "epsilon", "\316\265" }, { "zeta", "\316\266" }, { "eta", "\316\267" }, { "theta", "\316\270" },
+    { "lambda", "\316\273" }, { "mu", "\316\274" }, { "nu", "\316\275" }, { "xi", "\316\276" },
+    { "pi", "\317\200" }, { "rho", "\317\201" }, { "sigma", "\317\203" }, { "tau", "\317\204" },
+    { "phi", "\317\206" }, { "chi", "\317\207" }, { "psi", "\317\210" }, { "omega", "\317\211" },
+    { "Gamma", "\316\223" }, { "Delta", "\316\224" }, { "Theta", "\316\230" }, { "Lambda", "\316\233" },
+    { "Pi", "\316\240" }, { "Sigma", "\316\243" }, { "Phi", "\316\246" }, { "Psi", "\316\250" },
+    { "Omega", "\316\251" },
+  };
+
+  for (gsize i = 0; i < G_N_ELEMENTS(table); i++) {
+    if (strlen(table[i].name) == length && strncmp(table[i].name, name, length) == 0)
+      return table[i].symbol;
+  }
+  return NULL;
+}
+
+static gssize
+match_brace(const char *text, gsize length, gsize open)
+{
+  int depth = 0;
+
+  for (gsize j = open; j < length; j++) {
+    if (text[j] == '\\') { j++; continue; }
+    if (text[j] == '{') depth++;
+    else if (text[j] == '}' && --depth == 0) return (gssize) j;
+  }
+  return -1;
+}
+
+/* Generically unwraps LaTeX macros, scripts, and HTML breaks in prose text. */
+static char *
+strip_math(const char *segment, gsize segment_length)
+{
+  char *text = g_strndup(segment, segment_length);
+
+  for (int pass = 0; pass < 8; pass++) {
+    const gsize length = strlen(text);
+    GString *out = g_string_sized_new(length);
+    gsize i = 0;
+
+    while (i < length) {
+      const char c = text[i];
+
+      if (c == '<' && (gsize) html_break_length(text + i, text + length) > 0) {
+        gsize skip = html_break_length(text + i, text + length);
+        g_string_append_c(out, '\n');
+        i += skip;
+        continue;
+      }
+      if (c == '\\' && i + 1 < length) {
+        const char next = text[i + 1];
+        if (g_ascii_isalpha(next)) {
+          gsize word_end = i + 1;
+          while (word_end < length && g_ascii_isalpha(text[word_end]))
+            word_end++;
+          const char *name = text + i + 1;
+          const gsize name_length = word_end - i - 1;
+          if (word_end < length && text[word_end] == '{') {
+            const gssize close = match_brace(text, length, word_end);
+            if (close >= 0) {
+              const gboolean is_fraction =
+                  (name_length == 4 && strncmp(name, "frac", 4) == 0) ||
+                  (name_length == 5 && (strncmp(name, "dfrac", 5) == 0 || strncmp(name, "tfrac", 5) == 0));
+              if (is_fraction && (gsize) close + 1 < length && text[close + 1] == '{') {
+                const gssize close2 = match_brace(text, length, (gsize) close + 1);
+                if (close2 >= 0) {
+                  g_string_append_len(out, text + word_end + 1, close - (gssize) word_end - 1);
+                  g_string_append(out, "\342\201\204");
+                  g_string_append_len(out, text + close + 2, close2 - close - 2);
+                  i = (gsize) close2 + 1;
+                  continue;
+                }
+              }
+              const char *symbol = latex_symbol(name, name_length);
+              if (symbol != NULL)
+                g_string_append(out, symbol);
+              g_string_append_len(out, text + word_end + 1, close - (gssize) word_end - 1);
+              i = (gsize) close + 1;
+              continue;
+            }
+          }
+          const char *symbol = latex_symbol(name, name_length);
+          if (symbol != NULL) {
+            g_string_append(out, symbol);
+            i = word_end;
+            continue;
+          }
+          g_string_append_len(out, text + i, word_end - i);
+          i = word_end;
+          continue;
+        }
+        if (next == '[' || next == ']' || next == '(' || next == ')') { i += 2; continue; }
+        if (next == ';' || next == ',' || next == ':' || next == '!') {
+          g_string_append_c(out, ' ');
+          i += 2;
+          continue;
+        }
+      }
+      if ((c == '_' || c == '^') && i + 1 < length && text[i + 1] == '{') {
+        const gssize close = match_brace(text, length, i + 1);
+        if (close >= 0) {
+          const gsize argument_length = (gsize) close - i - 2;
+          if (argument_length <= 3) {
+            g_string_append_len(out, text + i + 2, (gssize) argument_length);
+          } else {
+            g_string_append(out, " (");
+            g_string_append_len(out, text + i + 2, (gssize) argument_length);
+            g_string_append_c(out, ')');
+          }
+          i = (gsize) close + 1;
+          continue;
+        }
+      }
+      g_string_append_c(out, c);
+      i++;
+    }
+
+    char *dollars;
+    while ((dollars = strstr(out->str, "$$")) != NULL)
+      g_string_erase(out, dollars - out->str, 2);
+
+    if (g_str_equal(out->str, text)) {
+      g_string_free(out, TRUE);
+      break;
+    }
+    g_free(text);
+    text = g_string_free(out, FALSE);
+  }
+  return text;
+}
+
+/* Applies strip_math outside fenced code blocks and inline code spans. */
 static char *
 normalize_markdown(const char *markdown)
 {
-  static const struct { const char *from; const char *to; } replacements[] = {
-    { "<br />", "\n" }, { "<br/>", "\n" }, { "<br>", "\n" },
-    { "<BR />", "\n" }, { "<BR/>", "\n" }, { "<BR>", "\n" },
-    { "\\(", "" }, { "\\)", "" }, { "\\[", "" }, { "\\]", "" },
-    { "\\times", "\303\227" }, { "\\cdot", "\302\267" },
-    { "\\approx", "\342\211\210" }, { "\\le", "\342\211\244" }, { "\\ge", "\342\211\245" },
-    { "\\pm", "\302\261" }, { "\\rightarrow", "\342\206\222" }, { "\\to", "\342\206\222" },
-    { "\\text", "" }, { "\\mathrm", "" },
-  };
+  g_auto(GStrv) lines = g_strsplit(markdown, "\n", -1);
+  GString *result = g_string_sized_new(strlen(markdown));
+  gboolean fenced = FALSE;
 
-  g_autoptr(GRegex) fraction = g_regex_new("\\\\[dt]?frac\\{([^{}]+)\\}\\{([^{}]+)\\}",
-                                           G_REGEX_DEFAULT, G_REGEX_MATCH_DEFAULT, NULL);
-  char *text = fraction != NULL
-      ? g_regex_replace(fraction, markdown, -1, 0, "\\1\342\201\204\\2", G_REGEX_MATCH_DEFAULT, NULL)
-      : NULL;
-  if (text == NULL)
-    text = g_strdup(markdown);
+  for (guint index = 0; lines[index] != NULL; index++) {
+    const char *line = lines[index];
+    const char *cursor = line;
 
-  for (gsize i = 0; i < G_N_ELEMENTS(replacements); i++) {
-    GString *builder = g_string_new(NULL);
-    const char *cursor = text;
-    const char *found;
-    while ((found = strstr(cursor, replacements[i].from)) != NULL) {
-      g_string_append_len(builder, cursor, found - cursor);
-      g_string_append(builder, replacements[i].to);
-      cursor = found + strlen(replacements[i].from);
+    while (*cursor == ' ' || *cursor == '\t')
+      cursor++;
+
+    if (g_str_has_prefix(cursor, "```") || g_str_has_prefix(cursor, "~~~")) {
+      fenced = !fenced;
+      g_string_append(result, line);
+    } else if (fenced) {
+      g_string_append(result, line);
+    } else {
+      const char *start = line;
+      gboolean code = FALSE;
+      for (;;) {
+        const char *tick = strchr(start, '`');
+        const gsize part_length = tick != NULL ? (gsize) (tick - start) : strlen(start);
+        if (code) {
+          g_string_append_len(result, start, (gssize) part_length);
+        } else {
+          g_autofree char *stripped = strip_math(start, part_length);
+          g_string_append(result, stripped);
+        }
+        if (tick == NULL)
+          break;
+        g_string_append_c(result, '`');
+        code = !code;
+        start = tick + 1;
+      }
     }
-    g_string_append(builder, cursor);
-    g_free(text);
-    text = g_string_free(builder, FALSE);
+    if (lines[index + 1] != NULL)
+      g_string_append_c(result, '\n');
   }
-  return text;
+  return g_string_free(result, FALSE);
 }
 
 void

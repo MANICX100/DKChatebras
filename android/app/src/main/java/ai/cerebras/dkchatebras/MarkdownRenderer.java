@@ -295,22 +295,132 @@ final class MarkdownRenderer {
         return end - position;
     }
 
-    /** Converts model-emitted inline HTML breaks and common LaTeX to plain text. */
+    private static final java.util.Map<String, String> SYMBOLS = createSymbols();
+
+    private static java.util.Map<String, String> createSymbols() {
+        java.util.Map<String, String> map = new java.util.HashMap<>();
+        map.put("times", "\u00d7"); map.put("div", "\u00f7"); map.put("cdot", "\u00b7");
+        map.put("pm", "\u00b1"); map.put("mp", "\u2213"); map.put("approx", "\u2248");
+        map.put("le", "\u2264"); map.put("leq", "\u2264"); map.put("ge", "\u2265"); map.put("geq", "\u2265");
+        map.put("ne", "\u2260"); map.put("neq", "\u2260"); map.put("sim", "~"); map.put("propto", "\u221d");
+        map.put("infty", "\u221e"); map.put("to", "\u2192"); map.put("rightarrow", "\u2192");
+        map.put("leftarrow", "\u2190"); map.put("Rightarrow", "\u21d2"); map.put("Leftarrow", "\u21d0");
+        map.put("leftrightarrow", "\u2194"); map.put("sum", "\u03a3"); map.put("prod", "\u03a0");
+        map.put("int", "\u222b"); map.put("sqrt", "\u221a"); map.put("ldots", "\u2026");
+        map.put("dots", "\u2026"); map.put("cdots", "\u22ef"); map.put("quad", " "); map.put("qquad", "  ");
+        map.put("left", ""); map.put("right", ""); map.put("text", ""); map.put("mathrm", "");
+        map.put("mathbf", ""); map.put("mathit", ""); map.put("operatorname", ""); map.put("displaystyle", "");
+        map.put("boxed", "");
+        map.put("alpha", "\u03b1"); map.put("beta", "\u03b2"); map.put("gamma", "\u03b3");
+        map.put("delta", "\u03b4"); map.put("epsilon", "\u03b5"); map.put("zeta", "\u03b6");
+        map.put("eta", "\u03b7"); map.put("theta", "\u03b8"); map.put("lambda", "\u03bb");
+        map.put("mu", "\u03bc"); map.put("nu", "\u03bd"); map.put("xi", "\u03be"); map.put("pi", "\u03c0");
+        map.put("rho", "\u03c1"); map.put("sigma", "\u03c3"); map.put("tau", "\u03c4");
+        map.put("phi", "\u03c6"); map.put("chi", "\u03c7"); map.put("psi", "\u03c8"); map.put("omega", "\u03c9");
+        map.put("Gamma", "\u0393"); map.put("Delta", "\u0394"); map.put("Theta", "\u0398");
+        map.put("Lambda", "\u039b"); map.put("Pi", "\u03a0"); map.put("Sigma", "\u03a3");
+        map.put("Phi", "\u03a6"); map.put("Psi", "\u03a8"); map.put("Omega", "\u03a9");
+        return map;
+    }
+
+    /** Applies generic LaTeX/HTML normalization outside fenced code and inline code. */
     static String normalize(String markdown) {
         String text = markdown.replace("\r\n", "\n").replace('\r', '\n');
-        text = text.replaceAll("(?i)<br\\s*/?>", "\n");
-        StringBuffer fractions = new StringBuffer(text.length());
-        java.util.regex.Matcher fraction = java.util.regex.Pattern
-                .compile("\\\\[dt]?frac\\{([^{}]+)\\}\\{([^{}]+)\\}").matcher(text);
-        while (fraction.find())
-            fraction.appendReplacement(fractions, java.util.regex.Matcher.quoteReplacement(fraction.group(1) + "\u2044" + fraction.group(2)));
-        fraction.appendTail(fractions);
-        text = fractions.toString();
-        text = text.replaceAll("\\\\[\\[\\]()]", "");
-        text = text.replace("\\times", "\u00d7").replace("\\cdot", "\u00b7")
-                .replace("\\approx", "\u2248").replace("\\le", "\u2264").replace("\\ge", "\u2265")
-                .replace("\\pm", "\u00b1").replace("\\rightarrow", "\u2192").replace("\\to", "\u2192")
-                .replace("\\text", "").replace("\\mathrm", "");
+        String[] lines = text.split("\n", -1);
+        StringBuilder out = new StringBuilder(text.length());
+        boolean fenced = false;
+        for (int index = 0; index < lines.length; index++) {
+            String line = lines[index];
+            String trimmed = line.trim();
+            if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) { fenced = !fenced; out.append(line); }
+            else if (fenced) out.append(line);
+            else {
+                String[] parts = line.split("`", -1);
+                for (int p = 0; p < parts.length; p++) {
+                    if (p > 0) out.append('`');
+                    out.append(p % 2 == 0 ? stripMath(parts[p]) : parts[p]);
+                }
+            }
+            if (index < lines.length - 1) out.append('\n');
+        }
+        return out.toString();
+    }
+
+    private static int matchBrace(String text, int open) {
+        int depth = 0;
+        for (int j = open; j < text.length(); j++) {
+            char c = text.charAt(j);
+            if (c == '\\') { j++; continue; }
+            if (c == '{') depth++;
+            else if (c == '}' && --depth == 0) return j;
+        }
+        return -1;
+    }
+
+    /** Generically unwraps LaTeX macros, scripts, and HTML breaks in prose text. */
+    private static String stripMath(String segment) {
+        String text = segment;
+        for (int pass = 0; pass < 8; pass++) {
+            StringBuilder out = new StringBuilder(text.length());
+            int i = 0;
+            while (i < text.length()) {
+                char c = text.charAt(i);
+                if (c == '<' && text.regionMatches(true, i, "<br", 0, 3)) {
+                    int close = text.indexOf('>', i + 3);
+                    if (close >= 0 && close - i <= 6) { out.append('\n'); i = close + 1; continue; }
+                }
+                if (c == '\\' && i + 1 < text.length()) {
+                    char next = text.charAt(i + 1);
+                    if (Character.isLetter(next)) {
+                        int wordEnd = i + 1;
+                        while (wordEnd < text.length() && Character.isLetter(text.charAt(wordEnd))) wordEnd++;
+                        String name = text.substring(i + 1, wordEnd);
+                        if (wordEnd < text.length() && text.charAt(wordEnd) == '{') {
+                            int close = matchBrace(text, wordEnd);
+                            if (close >= 0) {
+                                String argument = text.substring(wordEnd + 1, close);
+                                if (("frac".equals(name) || "dfrac".equals(name) || "tfrac".equals(name))
+                                        && close + 1 < text.length() && text.charAt(close + 1) == '{') {
+                                    int close2 = matchBrace(text, close + 1);
+                                    if (close2 >= 0) {
+                                        out.append(argument).append('\u2044').append(text, close + 2, close2);
+                                        i = close2 + 1;
+                                        continue;
+                                    }
+                                }
+                                String symbol = SYMBOLS.get(name);
+                                if (symbol != null) out.append(symbol);
+                                out.append(argument);
+                                i = close + 1;
+                                continue;
+                            }
+                        }
+                        String symbol = SYMBOLS.get(name);
+                        if (symbol != null) { out.append(symbol); i = wordEnd; continue; }
+                        out.append(text, i, wordEnd);
+                        i = wordEnd;
+                        continue;
+                    }
+                    if (next == '[' || next == ']' || next == '(' || next == ')') { i += 2; continue; }
+                    if (next == ';' || next == ',' || next == ':' || next == '!') { out.append(' '); i += 2; continue; }
+                }
+                if ((c == '_' || c == '^') && i + 1 < text.length() && text.charAt(i + 1) == '{') {
+                    int close = matchBrace(text, i + 1);
+                    if (close >= 0) {
+                        String argument = text.substring(i + 2, close);
+                        if (argument.length() <= 3) out.append(argument);
+                        else out.append(" (").append(argument).append(')');
+                        i = close + 1;
+                        continue;
+                    }
+                }
+                out.append(c);
+                i++;
+            }
+            String next = out.toString().replace("$$", "");
+            if (next.equals(text)) break;
+            text = next;
+        }
         return text;
     }
 

@@ -46,7 +46,7 @@ size_t FindClosing(const std::wstring& input, const std::wstring& marker, size_t
 void ParseInline(const std::wstring& input, std::wstring& output, std::vector<Span>& spans) {
     size_t i = 0;
     while (i < input.size()) {
-        if (input[i] == L'\\' && i + 1 < input.size()) {
+        if (input[i] == L'\\' && i + 1 < input.size() && iswpunct(input[i + 1])) {
             output.push_back(input[i + 1]);
             i += 2;
             continue;
@@ -214,53 +214,147 @@ bool EqualsIgnoreCase(const std::wstring& text, size_t position, const wchar_t* 
     return true;
 }
 
-// Converts model-emitted inline HTML breaks and common LaTeX to plain text.
+// Maps bare LaTeX macros to display text; wrapper macros map to "" and keep their argument.
+const wchar_t* SymbolFor(const std::wstring& name) {
+    static constexpr struct { const wchar_t* name; const wchar_t* symbol; } table[] = {
+        {L"times", L"\u00d7"}, {L"div", L"\u00f7"}, {L"cdot", L"\u00b7"}, {L"pm", L"\u00b1"}, {L"mp", L"\u2213"},
+        {L"approx", L"\u2248"}, {L"le", L"\u2264"}, {L"leq", L"\u2264"}, {L"ge", L"\u2265"}, {L"geq", L"\u2265"},
+        {L"ne", L"\u2260"}, {L"neq", L"\u2260"}, {L"sim", L"~"}, {L"propto", L"\u221d"}, {L"infty", L"\u221e"},
+        {L"to", L"\u2192"}, {L"rightarrow", L"\u2192"}, {L"leftarrow", L"\u2190"}, {L"Rightarrow", L"\u21d2"},
+        {L"Leftarrow", L"\u21d0"}, {L"leftrightarrow", L"\u2194"}, {L"sum", L"\u03a3"}, {L"prod", L"\u03a0"},
+        {L"int", L"\u222b"}, {L"sqrt", L"\u221a"}, {L"ldots", L"\u2026"}, {L"dots", L"\u2026"}, {L"cdots", L"\u22ef"},
+        {L"quad", L" "}, {L"qquad", L"  "}, {L"left", L""}, {L"right", L""}, {L"text", L""}, {L"mathrm", L""},
+        {L"mathbf", L""}, {L"mathit", L""}, {L"operatorname", L""}, {L"displaystyle", L""}, {L"boxed", L""},
+        {L"alpha", L"\u03b1"}, {L"beta", L"\u03b2"}, {L"gamma", L"\u03b3"}, {L"delta", L"\u03b4"},
+        {L"epsilon", L"\u03b5"}, {L"zeta", L"\u03b6"}, {L"eta", L"\u03b7"}, {L"theta", L"\u03b8"},
+        {L"lambda", L"\u03bb"}, {L"mu", L"\u03bc"}, {L"nu", L"\u03bd"}, {L"xi", L"\u03be"}, {L"pi", L"\u03c0"},
+        {L"rho", L"\u03c1"}, {L"sigma", L"\u03c3"}, {L"tau", L"\u03c4"}, {L"phi", L"\u03c6"}, {L"chi", L"\u03c7"},
+        {L"psi", L"\u03c8"}, {L"omega", L"\u03c9"}, {L"Gamma", L"\u0393"}, {L"Delta", L"\u0394"},
+        {L"Theta", L"\u0398"}, {L"Lambda", L"\u039b"}, {L"Pi", L"\u03a0"}, {L"Sigma", L"\u03a3"},
+        {L"Phi", L"\u03a6"}, {L"Psi", L"\u03a8"}, {L"Omega", L"\u03a9"},
+    };
+    for (const auto& entry : table)
+        if (name == entry.name) return entry.symbol;
+    return nullptr;
+}
+
+size_t MatchBrace(const std::wstring& text, size_t open) {
+    int depth = 0;
+    for (size_t j = open; j < text.size(); ++j) {
+        if (text[j] == L'\\') { ++j; continue; }
+        if (text[j] == L'{') ++depth;
+        else if (text[j] == L'}' && --depth == 0) return j;
+    }
+    return std::wstring::npos;
+}
+
+// Generically unwraps LaTeX macros, scripts, and HTML breaks in prose text.
+std::wstring StripMath(const std::wstring& segment) {
+    std::wstring text = segment;
+    for (int pass = 0; pass < 8; ++pass) {
+        std::wstring out;
+        out.reserve(text.size());
+        size_t i = 0;
+        while (i < text.size()) {
+            const wchar_t c = text[i];
+            if (c == L'<' && EqualsIgnoreCase(text, i, L"<br")) {
+                const size_t close = text.find(L'>', i + 3);
+                if (close != std::wstring::npos && close - i <= 6) { out += L"\r\n"; i = close + 1; continue; }
+            }
+            if (c == L'\\' && i + 1 < text.size()) {
+                const wchar_t next = text[i + 1];
+                if (iswalpha(next)) {
+                    size_t wordEnd = i + 1;
+                    while (wordEnd < text.size() && iswalpha(text[wordEnd])) ++wordEnd;
+                    const std::wstring name = text.substr(i + 1, wordEnd - i - 1);
+                    if (wordEnd < text.size() && text[wordEnd] == L'{') {
+                        const size_t close = MatchBrace(text, wordEnd);
+                        if (close != std::wstring::npos) {
+                            const std::wstring argument = text.substr(wordEnd + 1, close - wordEnd - 1);
+                            if ((name == L"frac" || name == L"dfrac" || name == L"tfrac") &&
+                                close + 1 < text.size() && text[close + 1] == L'{') {
+                                const size_t close2 = MatchBrace(text, close + 1);
+                                if (close2 != std::wstring::npos) {
+                                    out += argument;
+                                    out += L'\u2044';
+                                    out += text.substr(close + 2, close2 - close - 2);
+                                    i = close2 + 1;
+                                    continue;
+                                }
+                            }
+                            if (const wchar_t* symbol = SymbolFor(name)) out += symbol;
+                            out += argument;
+                            i = close + 1;
+                            continue;
+                        }
+                    }
+                    if (const wchar_t* symbol = SymbolFor(name)) { out += symbol; i = wordEnd; continue; }
+                    out.append(text, i, wordEnd - i);
+                    i = wordEnd;
+                    continue;
+                }
+                if (next == L'[' || next == L']' || next == L'(' || next == L')') { i += 2; continue; }
+                if (next == L';' || next == L',' || next == L':' || next == L'!') { out += L' '; i += 2; continue; }
+            }
+            if ((c == L'_' || c == L'^') && i + 1 < text.size() && text[i + 1] == L'{') {
+                const size_t close = MatchBrace(text, i + 1);
+                if (close != std::wstring::npos) {
+                    const std::wstring argument = text.substr(i + 2, close - i - 2);
+                    if (argument.size() <= 3) out += argument;
+                    else { out += L" ("; out += argument; out += L')'; }
+                    i = close + 1;
+                    continue;
+                }
+            }
+            out += c;
+            ++i;
+        }
+        ReplaceAll(out, L"$$", L"");
+        if (out == text) break;
+        text = out;
+    }
+    return text;
+}
+
+// Applies StripMath outside fenced code blocks and inline code spans.
 std::wstring NormalizeMarkdown(const std::wstring& markdown) {
-    std::wstring text;
-    text.reserve(markdown.size());
-    for (size_t i = 0; i < markdown.size();) {
-        if (markdown[i] == L'<' && EqualsIgnoreCase(markdown, i, L"<br")) {
-            size_t close = markdown.find(L'>', i + 3);
-            if (close != std::wstring::npos && close - i <= 6) {
-                text += L"\r\n";
-                i = close + 1;
-                continue;
+    std::wstring result;
+    result.reserve(markdown.size());
+    bool fenced = false;
+    size_t position = 0;
+    while (position <= markdown.size()) {
+        size_t end = markdown.find(L'\n', position);
+        const bool last = end == std::wstring::npos;
+        if (last) end = markdown.size();
+        std::wstring line = markdown.substr(position, end - position);
+        const bool hadReturn = !line.empty() && line.back() == L'\r';
+        if (hadReturn) line.pop_back();
+
+        const std::wstring trimmed = Trim(line);
+        if (trimmed.rfind(L"```", 0) == 0 || trimmed.rfind(L"~~~", 0) == 0) {
+            fenced = !fenced;
+            result += line;
+        } else if (fenced) {
+            result += line;
+        } else {
+            size_t i = 0;
+            bool code = false;
+            for (;;) {
+                const size_t tick = line.find(L'`', i);
+                const std::wstring part = line.substr(i, tick == std::wstring::npos ? std::wstring::npos : tick - i);
+                result += code ? part : StripMath(part);
+                if (tick == std::wstring::npos) break;
+                result += L'`';
+                code = !code;
+                i = tick + 1;
             }
         }
-        text += markdown[i++];
+        if (hadReturn) result += L'\r';
+        if (last) break;
+        result += L'\n';
+        position = end + 1;
     }
-
-    for (const wchar_t* macro : {L"\\frac", L"\\dfrac", L"\\tfrac"}) {
-        size_t position = 0;
-        while ((position = text.find(macro, position)) != std::wstring::npos) {
-            const size_t open1 = position + wcslen(macro);
-            if (open1 >= text.size() || text[open1] != L'{') { ++position; continue; }
-            const size_t close1 = text.find(L'}', open1 + 1);
-            if (close1 == std::wstring::npos || close1 + 1 >= text.size() || text[close1 + 1] != L'{') { ++position; continue; }
-            const size_t close2 = text.find(L'}', close1 + 2);
-            if (close2 == std::wstring::npos) { ++position; continue; }
-            const std::wstring replacement =
-                text.substr(open1 + 1, close1 - open1 - 1) + L"\u2044" + text.substr(close1 + 2, close2 - close1 - 2);
-            text.replace(position, close2 - position + 1, replacement);
-            position += replacement.size();
-        }
-    }
-
-    ReplaceAll(text, L"\\(", L"");
-    ReplaceAll(text, L"\\)", L"");
-    ReplaceAll(text, L"\\[", L"");
-    ReplaceAll(text, L"\\]", L"");
-    ReplaceAll(text, L"\\times", L"\u00d7");
-    ReplaceAll(text, L"\\cdot", L"\u00b7");
-    ReplaceAll(text, L"\\approx", L"\u2248");
-    ReplaceAll(text, L"\\le", L"\u2264");
-    ReplaceAll(text, L"\\ge", L"\u2265");
-    ReplaceAll(text, L"\\pm", L"\u00b1");
-    ReplaceAll(text, L"\\rightarrow", L"\u2192");
-    ReplaceAll(text, L"\\to", L"\u2192");
-    ReplaceAll(text, L"\\text", L"");
-    ReplaceAll(text, L"\\mathrm", L"");
-    return text;
+    return result;
 }
 
 Style HeadingStyle(size_t level) {
