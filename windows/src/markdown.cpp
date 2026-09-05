@@ -248,6 +248,19 @@ size_t MatchBrace(const std::wstring& text, size_t open) {
     return std::wstring::npos;
 }
 
+// Removes zero-width/emoji modifier characters RichEdit shows as boxes;
+// keycap combiners become "." so sequences like U+0031 U+FE0F U+20E3 read as "1.".
+void FilterProblemGlyphs(std::wstring& text) {
+    std::wstring out;
+    out.reserve(text.size());
+    for (wchar_t c : text) {
+        if (c == 0xFE0F || c == 0xFE0E || c == 0x200D || c == 0x200B || c == 0x200C) continue;
+        if (c == 0x20E3) { out += L'.'; continue; }
+        out += c;
+    }
+    text = std::move(out);
+}
+
 // Generically unwraps LaTeX macros, scripts, and HTML breaks in prose text.
 std::wstring StripMath(const std::wstring& segment) {
     std::wstring text = segment;
@@ -310,6 +323,7 @@ std::wstring StripMath(const std::wstring& segment) {
             ++i;
         }
         ReplaceAll(out, L"$$", L"");
+        FilterProblemGlyphs(out);
         if (out == text) break;
         text = out;
     }
@@ -375,9 +389,11 @@ void SetRichEditPlainText(HWND richEdit, const std::wstring& text) {
 }
 
 void AppendRichEditPlainText(HWND richEdit, const std::wstring& text) {
+    std::wstring filtered = text;
+    FilterProblemGlyphs(filtered);
     CHARRANGE end{-1, -1};
     SendMessageW(richEdit, EM_EXSETSEL, 0, reinterpret_cast<LPARAM>(&end));
-    SendMessageW(richEdit, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(text.c_str()));
+    SendMessageW(richEdit, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(filtered.c_str()));
     SendMessageW(richEdit, EM_SCROLLCARET, 0, 0);
 }
 

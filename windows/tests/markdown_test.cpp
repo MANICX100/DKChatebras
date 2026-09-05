@@ -30,7 +30,8 @@ int main() {
         L"| Name | Value |\n| :--- | ---: |\n| Alpha | **Yes** |\n| Beta | risk one<br>risk two |\n\n"
         L"Break-even: \\(\\frac{149}{50}=2.98\\) months\n\n"
         L"\\[ \\underbrace{C_{r}\\times N}_{\\text{total rent}} \\;<\\; \\underbrace{P - R}_{\\text{net loss}} \\]\n\n"
-        L"Path stays: C:\\Users\\Dan and code stays: `a \\times b`";
+        L"Path stays: C:\\Users\\Dan and code stays: `a \\times b`\n\n"
+        L"\u0031\uFE0F\u20E3 First keycap and \u0032\uFE0F\u20E3 second";
     RenderMarkdown(edit, markdown, false);
 
     const int length = GetWindowTextLengthW(edit);
@@ -56,6 +57,10 @@ int main() {
         {"annotation kept", rendered.find(L"(total rent)") != std::wstring::npos},
         {"windows path kept", rendered.find(L"C:\\Users\\Dan") != std::wstring::npos},
         {"inline code kept", rendered.find(L"a \\times b") != std::wstring::npos},
+        {"no variation selector", rendered.find(L'\uFE0F') == std::wstring::npos},
+        {"no combining keycap", rendered.find(L'\u20E3') == std::wstring::npos},
+        {"keycap one readable", rendered.find(L"1. First keycap") != std::wstring::npos},
+        {"keycap two readable", rendered.find(L"2. second") != std::wstring::npos},
         {"bold applied", HasEffect(edit, L"bold only", CFE_BOLD)},
         {"header bold", HasEffect(edit, L"Name", CFE_BOLD)},
         {"bold cell bold", HasEffect(edit, L"Yes", CFE_BOLD)},
