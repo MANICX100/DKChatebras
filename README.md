@@ -1,6 +1,6 @@
 # DKChatebras
 
-DKChatebras is a fast, local Cerebras chat client with native Android, Windows, and Fedora GNOME editions plus the original dependency-light web app.
+DKChatebras is a fast, local Cerebras chat client with native Android, Windows, and Linux editions plus the original dependency-light web app.
 
 All editions support:
 
@@ -68,34 +68,30 @@ Build from PowerShell in `windows/`:
 
 Windows 7 requires current TLS 1.2 and root-certificate servicing to reach the Cerebras HTTPS endpoint. See [`windows/README.md`](windows/README.md) for details.
 
-## Fedora GNOME / AppImage
+## Linux
 
-`linux/` contains source for a fully native C17 GTK4/libadwaita application targeting current Fedora. It uses libsoup 3, json-glib, and GNOME Secret Service; it does not use Electron or a WebView.
+`linux/` contains a minimal, performance-first native C17 Linux client using direct X11 (MIT-SHM), FreeType2, Fontconfig, and lazy-loaded system OpenSSL — with no Electron, WebView, GTK, Qt, or GLib runtime.
 
-- Appearance: current adaptive GNOME/libadwaita design
-- API key: GNOME Keyring/Secret Service
-- History: metadata index plus separate per-conversation JSON files
-- Packaging: Meson project and `linuxdeploy` AppImage script
+- Footprint: **~176 KiB** stripped standalone executable (6 direct shared libraries, ~35 ms startup, ~4.6 MiB PSS idle)
+- Appearance: responsive dark interface with collapsible/overlay sidebar, bordered GFM tables, LaTeX math symbol normalization, and fenced code containers
+- API key: `CEREBRAS_API_KEY` env var, Secret Service (`secret-tool`), or `0600` local config fallback
+- History: metadata index plus separate per-conversation JSON files written asynchronously (100% compatible with previous Linux versions)
 
-Build on current Fedora from `linux/`:
-
-```sh
-sudo dnf install gcc meson ninja-build pkgconf-pkg-config \
-  gtk4-devel libadwaita-devel libsoup3-devel \
-  json-glib-devel libsecret-devel
-meson setup build --buildtype=release
-meson compile -C build
-./build/src/dkchatebras
-```
-
-Generate an AppImage on Fedora:
+Build on Linux from `linux/`:
 
 ```sh
-chmod +x packaging/build-appimage.sh
-./packaging/build-appimage.sh
+make release
+make test
+./build/dkchatebras
 ```
 
-The Linux edition is intentionally not compiled on this Windows host. See [`linux/README.md`](linux/README.md) for full dependency, installation, AppImage, and validation instructions.
+Build standalone release binary and portable `.tar.gz` bundle:
+
+```sh
+./packaging/build-release.sh v4
+```
+
+See [`linux/README.md`](linux/README.md) for build dependencies, keyboard shortcuts, installation, and benchmarks against the previous GTK4 edition.
 
 ## Privacy
 

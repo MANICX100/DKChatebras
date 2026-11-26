@@ -1,11 +1,11 @@
 [Desktop Entry]
 Name=DKChatebras
-Comment=Chat with Cerebras models
+Comment=Fast minimal native Linux client for Cerebras chat models
 Exec=dkchatebras
 Icon=io.github.dkchatebras.DKChatebras
 Terminal=false
 Type=Application
-Categories=Network;Chat;GNOME;GTK;
+Categories=Network;Chat;
 Keywords=AI;Cerebras;Chat;LLM;
 StartupNotify=true
 DBusActivatable=false

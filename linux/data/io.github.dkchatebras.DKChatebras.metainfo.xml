@@ -2,12 +2,12 @@
 <component type="desktop-application">
   <id>io.github.dkchatebras.DKChatebras</id>
   <name>DKChatebras</name>
-  <summary>Native GNOME client for Cerebras chat models</summary>
+  <summary>Fast, minimal native Linux client for Cerebras chat models</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <description>
-    <p>DKChatebras is a native GTK and libadwaita chat client that streams responses directly from the Cerebras API.</p>
-    <p>It stores the API key in Secret Service, keeps local per-chat history, and renders completed responses as native formatted text.</p>
+    <p>DKChatebras is a lightweight, performance-first native C17 Linux desktop client that streams responses directly from the Cerebras API without Electron, GTK, Qt, or a WebView.</p>
+    <p>It renders directly via X11 MIT-SHM and FreeType2, uses lazy-loaded system OpenSSL for TLS, stores API keys via Secret Service with a 0600 file fallback, keeps lazy-loaded local per-chat JSON history, and formats completed responses with native headings, bordered tables, LaTeX math symbols, and fenced code blocks.</p>
   </description>
   <launchable type="desktop-id">io.github.dkchatebras.DKChatebras.desktop</launchable>
   <provides>
@@ -16,14 +16,16 @@
   <recommends>
     <control>pointing</control>
     <control>keyboard</control>
-    <control>touch</control>
   </recommends>
   <content_rating type="oars-1.1" />
   <developer id="io.github.dkchatebras">
     <name>DKChatebras Contributors</name>
   </developer>
-  <url type="homepage">https://cerebras.ai/</url>
+  <url type="homepage">https://github.com/MANICX100/DKChatebras</url>
   <releases>
+    <release version="2.0.0" date="2026-11-26">
+      <description><p>Ground-up minimal native C17 rewrite replacing GTK4/libadwaita/libsoup/json-glib/libsecret with direct X11 MIT-SHM + FreeType2 rendering, zero-dependency JSON/Markdown/LaTeX/table engine, and lazy-loaded OpenSSL TLS.</p></description>
+    </release>
     <release version="1.0.0" date="2026-09-02">
       <description><p>Initial Fedora GNOME release.</p></description>
     </release>
