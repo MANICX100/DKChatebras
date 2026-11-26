@@ -1,5 +1,30 @@
 # DKChatebras
 
+[![Latest Release](https://img.shields.io/github/v/release/MANICX100/DKChatebras?style=flat-square&color=ff5b38&label=release)](https://github.com/MANICX100/DKChatebras/releases/latest)
+[![Release Date](https://img.shields.io/github/release-date/MANICX100/DKChatebras?style=flat-square&color=blue)](https://github.com/MANICX100/DKChatebras/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/MANICX100/DKChatebras/total?style=flat-square&color=brightgreen)](https://github.com/MANICX100/DKChatebras/releases)
+[![Web Deploy](https://img.shields.io/github/actions/workflow/status/MANICX100/DKChatebras/pages.yml?style=flat-square&label=web%20deploy)](https://github.com/MANICX100/DKChatebras/actions/workflows/pages.yml)
+[![Live Web App](https://img.shields.io/badge/web%20app-live-ff5b38?style=flat-square&logo=githubpages&logoColor=white)](https://manicx100.github.io/DKChatebras/)
+[![Last Commit](https://img.shields.io/github/last-commit/MANICX100/DKChatebras?style=flat-square)](https://github.com/MANICX100/DKChatebras/commits/main)
+[![Repo Size](https://img.shields.io/github/repo-size/MANICX100/DKChatebras?style=flat-square)](https://github.com/MANICX100/DKChatebras)
+[![Stars](https://img.shields.io/github/stars/MANICX100/DKChatebras?style=flat-square)](https://github.com/MANICX100/DKChatebras/stargazers)
+[![Issues](https://img.shields.io/github/issues/MANICX100/DKChatebras?style=flat-square)](https://github.com/MANICX100/DKChatebras/issues)
+
+[![Linux](https://img.shields.io/badge/Linux-C17%20%7C%20X11%20%2B%20FreeType2-FCC624?style=flat-square&logo=linux&logoColor=black)](linux/README.md)
+[![Windows](https://img.shields.io/badge/Windows-C%2B%2B17%20%7C%20Win32-0078D6?style=flat-square&logo=windows&logoColor=white)](windows/README.md)
+[![Android](https://img.shields.io/badge/Android-Java%20%7C%20API%2023--37-3DDC84?style=flat-square&logo=android&logoColor=black)](android/README.md)
+[![Web](https://img.shields.io/badge/Web-Vanilla%20JS%20%2F%20HTML%20%2F%20CSS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](https://manicx100.github.io/DKChatebras/)
+[![Linux License](https://img.shields.io/badge/Linux%20license-GPL--3.0--or--later-blue?style=flat-square&logo=gnu&logoColor=white)](linux/COPYING)
+
+[![Linux Binary](https://img.shields.io/badge/Linux%20binary-176%20KiB-2ea44f?style=flat-square)](linux/README.md#benchmarks-vs-previous-gtk4libadwaita-build-v3)
+[![Linux Startup](https://img.shields.io/badge/Linux%20startup-35.6%20ms-2ea44f?style=flat-square)](linux/README.md#benchmarks-vs-previous-gtk4libadwaita-build-v3)
+[![Linux Idle Memory](https://img.shields.io/badge/Linux%20idle%20PSS-4.6%20MiB-2ea44f?style=flat-square)](linux/README.md#benchmarks-vs-previous-gtk4libadwaita-build-v3)
+[![Linux Direct Libs](https://img.shields.io/badge/Linux%20direct%20libs-6-2ea44f?style=flat-square)](linux/README.md#benchmarks-vs-previous-gtk4libadwaita-build-v3)
+[![Markdown Parse](https://img.shields.io/badge/Markdown%20parse-160%20MB%2Fs-2ea44f?style=flat-square)](linux/README.md#benchmarks-vs-previous-gtk4libadwaita-build-v3)
+[![No Electron or WebView](https://img.shields.io/badge/Electron%20%2F%20WebView-none-ff5b38?style=flat-square)](#dkchatebras)
+[![Cerebras API](https://img.shields.io/badge/API-Cerebras%20SSE-7c3aed?style=flat-square)](https://cerebras.ai/)
+[![Models](https://img.shields.io/badge/Models-gpt--oss--120b%20%7C%20gemma--4--31b-555555?style=flat-square)](#dkchatebras)
+
 DKChatebras is a fast, local Cerebras chat client with native Android, Windows, and Linux editions plus the original dependency-light web app.
 
 All editions support:
@@ -77,7 +102,25 @@ Windows 7 requires current TLS 1.2 and root-certificate servicing to reach the C
 - API key: `CEREBRAS_API_KEY` env var, Secret Service (`secret-tool`), or `0600` local config fallback
 - History: metadata index plus separate per-conversation JSON files written asynchronously (100% compatible with previous Linux versions)
 
-Build on Linux from `linux/`:
+### Quick install (x86_64)
+
+Privileged commands below use [`doas`](https://wiki.archlinux.org/title/Doas) ([OpenDoas install & setup guide](https://github.com/Duncaen/OpenDoas)) by default, with `sudo` alternatives provided.
+
+Install directly into `/usr/local/bin/dkchatebras` with `doas`:
+
+```sh
+curl -fsSL https://github.com/MANICX100/DKChatebras/releases/download/v4/DKChatebras-v4-linux-x86_64 -o /tmp/dkchatebras && doas install -Dm755 /tmp/dkchatebras /usr/local/bin/dkchatebras && rm -f /tmp/dkchatebras
+```
+
+Or with `sudo`:
+
+```sh
+curl -fsSL https://github.com/MANICX100/DKChatebras/releases/download/v4/DKChatebras-v4-linux-x86_64 -o /tmp/dkchatebras && sudo install -Dm755 /tmp/dkchatebras /usr/local/bin/dkchatebras && rm -f /tmp/dkchatebras
+```
+
+### Build from source
+
+From `linux/`:
 
 ```sh
 make release

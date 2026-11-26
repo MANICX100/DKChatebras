@@ -4,6 +4,8 @@ DKChatebras for Linux is a fast, minimal, dependency-light native desktop client
 
 The stripped release executable is **~176 KiB** and links directly to only **6 system libraries** (`libX11`, `libXext`, `libfreetype`, `libfontconfig`, `libm`, `libc`).
 
+> **Note on privilege elevation:** Commands below use [`doas`](https://wiki.archlinux.org/title/Doas) by default. See the [ArchWiki `doas` guide](https://wiki.archlinux.org/title/Doas) or [OpenDoas on GitHub](https://github.com/Duncaen/OpenDoas) for how to install and configure `doas` on Linux. Equivalent `sudo` alternatives are included alongside each command.
+
 ## Features
 
 - **Minimal & fast native UI**: Direct X11 + MIT-SHM ARGB32 software rendering with analytical anti-aliased rounded geometry, FreeType2 glyph caching with automatic Fontconfig fallback faces, viewport culling, and 60 fps streaming paint pacing
@@ -12,6 +14,20 @@ The stripped release executable is **~176 KiB** and links directly to only **6 s
 - **Direct streaming HTTPS**: Non-blocking POSIX TCP + lazy `dlopen` OpenSSL with full `SSL_VERIFY_PEER` certificate and hostname verification, HTTP/1.1 chunked/SSE streaming, and instant pipe-signaled cancellation
 - **Lazy local history**: 100% compatible with previous versions (`~/.local/share/dkchatebras/chats/index.json` + `<uuid>.json`), atomic `0600` writes on a background writer thread so disk I/O never stalls the UI
 - **Credential storage**: Checks `CEREBRAS_API_KEY` env var → `secret-tool` (GNOME Keyring / KWallet Secret Service, compatible with existing `service=cerebras-api` entries) → `0600` fallback file at `$XDG_CONFIG_HOME/dkchatebras/api_key`
+
+## Quick install (x86_64)
+
+Install the prebuilt binary directly into `/usr/local/bin/dkchatebras` using `doas`:
+
+```sh
+curl -fsSL https://github.com/MANICX100/DKChatebras/releases/download/v4/DKChatebras-v4-linux-x86_64 -o /tmp/dkchatebras && doas install -Dm755 /tmp/dkchatebras /usr/local/bin/dkchatebras && rm -f /tmp/dkchatebras
+```
+
+Alternative using `sudo`:
+
+```sh
+curl -fsSL https://github.com/MANICX100/DKChatebras/releases/download/v4/DKChatebras-v4-linux-x86_64 -o /tmp/dkchatebras && sudo install -Dm755 /tmp/dkchatebras /usr/local/bin/dkchatebras && rm -f /tmp/dkchatebras
+```
 
 ## Keyboard shortcuts
 
@@ -30,7 +46,7 @@ Measured on Fedora 45 (`x86_64`, live X11 `:0`), same isolated `XDG_DATA_HOME` f
 
 | Metric | Old GTK4/libadwaita (`v3`) | New Native C17/X11 (`v4`) | Improvement |
 | --- | ---: | ---: | ---: |
-| Release artifact size | 32.19 MiB (AppImage) | **176 KiB** binary / **~94 KiB** `.tar.gz` | **188× – 350× smaller** |
+| Release artifact size | 32.19 MiB (AppImage) | **176 KiB** binary / **94 KiB** `.tar.gz` | **188× – 350× smaller** |
 | Direct `NEEDED` shared libs | 9 (GTK4/Adwaita/Soup/JSON/Secret) | **6** (`X11`, `Xext`, `freetype`, `fontconfig`, `m`, `c`) | No toolkit stack |
 | Total `ldd` runtime libs | 119 | **20** | **6.0× fewer** |
 | Startup to mapped window (median, 8 runs) | 123.8 ms | **35.6 ms** | **3.5× faster** |
@@ -42,21 +58,27 @@ Measured on Fedora 45 (`x86_64`, live X11 `:0`), same isolated `XDG_DATA_HOME` f
 
 ## Build dependencies
 
-Only a C17 compiler, `make`, `pkg-config`, and development headers for X11/Xext/FreeType2/Fontconfig are needed (plus system `libssl` at runtime for HTTPS; `secret-tool` is optional for keyring storage):
+Only a C17 compiler, `make`, `pkg-config`, and development headers for X11/Xext/FreeType2/Fontconfig are needed (plus system `libssl` at runtime for HTTPS; `secret-tool` is optional for keyring storage). Don't have `doas` yet? Follow the [ArchWiki `doas` guide](https://wiki.archlinux.org/title/Doas) or [OpenDoas setup instructions](https://github.com/Duncaen/OpenDoas), or use the `sudo` alternatives below.
 
 **Fedora:**
 ```sh
-sudo dnf install gcc make pkgconf-pkg-config libX11-devel libXext-devel freetype-devel fontconfig-devel
+doas dnf install gcc make pkgconf-pkg-config libX11-devel libXext-devel freetype-devel fontconfig-devel
+# Alternative with sudo:
+# sudo dnf install gcc make pkgconf-pkg-config libX11-devel libXext-devel freetype-devel fontconfig-devel
 ```
 
 **Debian / Ubuntu:**
 ```sh
-sudo apt install gcc make pkg-config libx11-dev libxext-dev libfreetype-dev libfontconfig-dev
+doas apt install gcc make pkg-config libx11-dev libxext-dev libfreetype-dev libfontconfig-dev
+# Alternative with sudo:
+# sudo apt install gcc make pkg-config libx11-dev libxext-dev libfreetype-dev libfontconfig-dev
 ```
 
 **Arch Linux:**
 ```sh
-sudo pacman -S gcc make pkgconf libx11 libxext freetype2 fontconfig
+doas pacman -S gcc make pkgconf libx11 libxext freetype2 fontconfig
+# Alternative with sudo:
+# sudo pacman -S gcc make pkgconf libx11 libxext freetype2 fontconfig
 ```
 
 ## Build, test, and install
@@ -76,11 +98,11 @@ make debug
 make CC=clang test-asan
 ```
 
-Install system-wide or per-user:
+Install system-wide (using `doas`, or `sudo` as alternative) or per-user:
 
 ```sh
-sudo make install                      # installs under /usr/local
-make install PREFIX="$HOME/.local"     # installs under ~/.local
+doas make install                      # installs under /usr/local (alternative: sudo make install)
+make install PREFIX="$HOME/.local"     # installs under ~/.local (no root required)
 ```
 
 Build release distribution artifacts (`build/dist/DKChatebras-<ver>-linux-<arch>` and `.tar.gz`):
