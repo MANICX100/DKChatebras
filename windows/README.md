@@ -2,6 +2,8 @@
 
 DKChatebras is a dependency-free native Win32 desktop client for Cerebras chat completions. It uses C++17, GDI/RichEdit, DPAPI, and WinHTTP—no .NET runtime, browser engine, package manager, or third-party library is required.
 
+> **API key required:** You need your own Cerebras Cloud API key to use DKChatebras. See [Before You Start: Get a Cerebras API Key](../README.md#before-you-start-get-a-cerebras-api-key-required) for step-by-step account, billing, and key setup instructions.
+
 ## Features
 
 - Streaming Cerebras chat completions over WinHTTP/SSE
@@ -13,7 +15,23 @@ DKChatebras is a dependency-free native Win32 desktop client for Cerebras chat c
 - Segoe UI and custom-painted rounded surfaces with system dark preference and modern DWM frame attributes where available
 - Static MSVC runtime (`/MT`) and a single x64 executable
 
-## Requirements
+## Quick install via Scoop
+
+Install directly from [`bucket/dkchatebras.json`](../bucket/dkchatebras.json) in PowerShell:
+
+```powershell
+scoop install https://raw.githubusercontent.com/MANICX100/DKChatebras/main/bucket/dkchatebras.json
+```
+
+Or add the repository as a Scoop bucket:
+
+```powershell
+scoop bucket add dkchatebras https://github.com/MANICX100/DKChatebras && scoop install dkchatebras/dkchatebras
+```
+
+*(Don't have [Scoop](https://scoop.sh/) yet? Install it first in PowerShell with `irm get.scoop.sh | iex`.)*
+
+## Requirements (building from source)
 
 - Windows 7 SP1 or later
 - TLS 1.2 support enabled on Windows 7 (current servicing updates are required for Cerebras HTTPS)

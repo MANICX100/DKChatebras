@@ -12,6 +12,7 @@
 
 [![Linux](https://img.shields.io/badge/Linux-C17%20%7C%20X11%20%2B%20FreeType2-FCC624?style=flat-square&logo=linux&logoColor=black)](linux/README.md)
 [![Windows](https://img.shields.io/badge/Windows-C%2B%2B17%20%7C%20Win32-0078D6?style=flat-square&logo=windows&logoColor=white)](windows/README.md)
+[![Scoop](https://img.shields.io/badge/Scoop-dkchatebras-0078D6?style=flat-square&logo=windows&logoColor=white)](bucket/dkchatebras.json)
 [![Android](https://img.shields.io/badge/Android-Java%20%7C%20API%2023--37-3DDC84?style=flat-square&logo=android&logoColor=black)](android/README.md)
 [![Web](https://img.shields.io/badge/Web-Vanilla%20JS%20%2F%20HTML%20%2F%20CSS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](https://manicx100.github.io/DKChatebras/)
 [![Linux License](https://img.shields.io/badge/Linux%20license-GPL--3.0--or--later-blue?style=flat-square&logo=gnu&logoColor=white)](linux/COPYING)
@@ -35,6 +36,39 @@ All editions support:
 - Lazy conversation history: metadata loads at startup; messages load only when selected
 - Plain-text streaming followed by one-pass native or sanitized HTML-style Markdown formatting
 - New, delete, and cancellable conversations
+
+## Before You Start: Get a Cerebras API Key (Required)
+
+> [!IMPORTANT]
+> **A Cerebras API key is required to use DKChatebras.**
+> DKChatebras is a free client app — it does **not** include built-in AI credits or a subscription. Your messages go directly from your device to Cerebras, so you need your own Cerebras Cloud account and API key before the app can answer prompts.
+
+Never used an API key before? Follow these 4 quick steps:
+
+### 1. Create a Cerebras Cloud account
+1. Open [**cloud.cerebras.ai**](https://cloud.cerebras.ai/) in your browser.
+2. Click **Sign Up** and create an account (using email, Google, or GitHub).
+
+### 2. Set up billing / add prepaid credits
+Cerebras uses **prepaid pay-as-you-go credits** (similar to topping up a gift card — **not** a recurring monthly subscription):
+1. In the Cerebras Cloud Console, open the **Billing** / **Pay as you go** tab.
+2. **Add a payment card:** Adding a verified card unlocks a one-time **$5 promotional credit** (valid for 30 days) so you can try it out — you are not charged just for adding a card.
+3. **Buy credits when ready:** Click **Add Credits** to top up your balance (deposits start at **$10 USD**). Buying credits upgrades your account to the **Developer** tier with higher rate limits and larger context windows.
+4. **Stay in control of spending:**
+   - **Auto-Recharge is OFF by default.** If your balance reaches \$0, requests simply stop until you choose to add more credits — no surprise bills.
+   - You only pay for the exact tokens you send and receive. Check current per-model rates at [**cerebras.ai/pricing**](https://www.cerebras.ai/pricing) and monitor your spend anytime under **Usage Monitoring → Cost**.
+
+### 3. Generate and copy your API key
+1. In the left sidebar of [**cloud.cerebras.ai**](https://cloud.cerebras.ai/), click **API Keys** (if you are on a paid account, select a project first).
+2. Click **Generate API Key**, type a label like `DKChatebras`, and confirm.
+3. **Copy the key right away** (it looks like `csk-...`). For security, Cerebras will not display the full key again once you close the popup.
+4. Treat your API key like a password — never post it publicly or commit it to Git.
+
+### 4. Paste your key into DKChatebras
+- **Linux:** Click the key icon in the top bar (or press `Ctrl+K`), paste your key, and click **Save Key** (or set the `CEREBRAS_API_KEY` environment variable).
+- **Windows:** Open the API key settings in the app, paste your key, and save (encrypted with Windows DPAPI).
+- **Android:** Tap **Key** in the top bar (or **Manage API key** in the drawer), paste your key, and save (encrypted in Android Keystore).
+- **Web:** Paste your key directly into the top-bar API key field.
 
 ## Web
 
@@ -85,7 +119,25 @@ See [`android/README.md`](android/README.md) for installation and architecture d
 - Packaging: static MSVC runtime in one x64 executable
 - Release executable: `windows/build/bin/DKChatebras.exe`
 
-Build from PowerShell in `windows/`:
+### Quick install via Scoop
+
+Install directly from the Scoop manifest ([`bucket/dkchatebras.json`](bucket/dkchatebras.json)) in PowerShell:
+
+```powershell
+scoop install https://raw.githubusercontent.com/MANICX100/DKChatebras/main/bucket/dkchatebras.json
+```
+
+Or add this repository as a Scoop bucket for easy `scoop update dkchatebras` updates:
+
+```powershell
+scoop bucket add dkchatebras https://github.com/MANICX100/DKChatebras && scoop install dkchatebras/dkchatebras
+```
+
+*(Don't have [Scoop](https://scoop.sh/) yet? Install it first in PowerShell with `irm get.scoop.sh | iex`.)*
+
+### Build from source
+
+From PowerShell in `windows/`:
 
 ```powershell
 .\build.ps1 -Configuration Release -Clean

@@ -1,0 +1,27 @@
+{
+    "version": "3",
+    "description": "Fast, dependency-free native Win32 desktop client for Cerebras chat models",
+    "homepage": "https://github.com/MANICX100/DKChatebras",
+    "license": "GPL-3.0-or-later",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/MANICX100/DKChatebras/releases/download/v3/DKChatebras-v3-windows-x64.exe#/DKChatebras.exe",
+            "hash": "0bae7b8981e79464b8cf82ffd37707bbd2b728ce91ba24518e096675ce46fcfd"
+        }
+    },
+    "bin": "DKChatebras.exe",
+    "shortcuts": [
+        [
+            "DKChatebras.exe",
+            "DKChatebras"
+        ]
+    ],
+    "checkver": "github",
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/MANICX100/DKChatebras/releases/download/v$version/DKChatebras-v$version-windows-x64.exe#/DKChatebras.exe"
+            }
+        }
+    }
+}
